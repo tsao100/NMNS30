@@ -19,6 +19,7 @@
     <a class="btn alt" href="index.html">遊戲選單</a>
     <button class="btn alt" type="button" id="again">重新開始</button>
     <a class="btn alt" id="next" href="#">下一款 →</a>
+    <a class="btn alt" id="fb" href="feedback.html">📝 提供當年資料</a>
   </div>
 </main>
 <script src="data/games.js"></script>
@@ -37,6 +38,7 @@
   document.querySelector(".edu").style.setProperty("--c", NMNS_CATS[g.cat].color);
   document.getElementById("prev").href = "play.html?g=" + (n > 1 ? n - 1 : 30);
   document.getElementById("next").href = "play.html?g=" + (n < 30 ? n + 1 : 1);
+  document.getElementById("fb").href = "feedback.html?g=" + n;
   document.getElementById("again").addEventListener("click", function () { location.reload(); });
   var s = document.createElement("script");
   s.src = "games/g" + no + ".js";
