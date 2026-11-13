@@ -1,359 +1,1097 @@
-' G24.BAS - Laser Maze (LEI SHE MI GONG)
-' Educational content (1991 list): a laser gun and mirrors; the LAW OF REFLECTION
-'   (angle of incidence = angle of reflection).
-' Controls: arrows move cursor, / or \ place a mirror, X removes it, ENTER fires,
-'   R clears all mirrors, ESC = menu
-DECLARE SUB Delay (secs!)
+'==============================================================================
+'  LAZER MAZE  -  QBasic 1.1 version (SCREEN 12, 640x480, 16 colors) + MOUSE
+'
+'  Remake of the 1982 Apple II game "Lazer Maze" (James Spain / Avant-Garde).
+'
+'  RULES
+'   - 10 x 10 box holding slanted reflectors ("baffles").
+'   - Ports 10..49 around the box:  10-19 top (left to right)
+'                                   20-29 left (top to bottom)
+'                                   30-39 bottom (left to right)
+'                                   40-49 right (top to bottom)
+'   - 20 beams per game. Each beam uses one entry and one exit port.
+'   - The soldier (blinking) fires from the entry port. CLICK the port where
+'     you think the beam comes out (typing the 2 digits works too).
+'     Right: the beam reflects and kills the alien.
+'     Wrong: the alien throws a bomb at the soldier.
+'   - Score per beam = baffle bonus + INT(2000 * bounces / time ticks).
+'   - Number of baffles grows with your score (20,30,40,...,70).
+'   - Beams already fired stay on the screen, each in its own color
+'     (after 14 beams the colors repeat as dashed lines).
+'
+'  MOUSE     click buttons, click a port to answer (needs a DOS mouse driver)
+'  KEYBOARD  digits = answer, ENTER = next / start, ESC = leave, F2 = sound
+'==============================================================================
+DEFINT A-Z
+
+DECLARE SUB Init ()
+DECLARE SUB Mouse (a, b, c, d)
+DECLARE SUB MShow ()
+DECLARE SUB MHide ()
+DECLARE SUB PollMouse ()
+DECLARE SUB Snd (f, t)
+DECLARE SUB Dly (s!)
+DECLARE SUB FlushIn ()
 DECLARE FUNCTION GetKey$ ()
-DECLARE SUB Title ()
-DECLARE SUB LoadLevel (n%)
-DECLARE SUB DrawCell (x%, y%)
-DECLARE SUB DrawBoard ()
-DECLARE SUB Trace (dr%)
-DECLARE SUB Half (x%, y%, d%)
-DECLARE SUB BeamSeg (x1%, y1%, x2%, y2%)
-DECLARE SUB Pr (r%, t$)
-DECLARE SUB Msg (t$)
-DECLARE SUB PlayLevel ()
-DECLARE SUB Finale ()
+DECLARE FUNCTION Num$ (v)
+DECLARE FUNCTION NumL$ (v AS LONG)
+DECLARE FUNCTION PortAt (x, y)
+DECLARE SUB DrawSoldier (cx, cy)
+DECLARE SUB DrawAlien (cx, cy)
+DECLARE SUB EraseActor (cx, cy)
+DECLARE SUB SoldOn (x, y)
+DECLARE SUB SoldOff ()
+DECLARE SUB AlienOn (x, y)
+DECLARE SUB AlienOff ()
+DECLARE SUB DrawSeg (x1, y1, x2, y2, c, dash)
+DECLARE SUB DrawMirror (i, j, kind, c)
+DECLARE SUB DrawLabel (p, hl)
+DECLARE SUB PutStat (r, l$, v$, c)
+DECLARE SUB DrawStats ()
+DECLARE SUB ShowMsg (l)
+DECLARE SUB Msg (l, t$, c)
+DECLARE SUB StatusReset ()
+DECLARE SUB DrawBtnXY (x, y, w, h, t$, hov)
+DECLARE SUB DrawBtn (i, hov)
+DECLARE SUB DrawSide ()
+DECLARE SUB ClearBtns ()
+DECLARE SUB AddBtn (x, y, w, h, t$, k1, k2)
+DECLARE FUNCTION SideHit (x, y)
+DECLARE FUNCTION WaitChoice ()
+DECLARE SUB DrawGame ()
+DECLARE SUB CText (r, t$, c)
+DECLARE SUB DrawTitle ()
+DECLARE SUB DrawLevel ()
+DECLARE SUB ResetBoardView ()
+DECLARE SUB BuildMaze (n)
+DECLARE SUB Trace (p)
+DECLARE SUB ExplodeAt (x, y)
+DECLARE SUB ThrowBomb (x1, y1, x2, y2)
+DECLARE SUB DoShot (p, g, c, dash)
+DECLARE SUB Demo (p, c)
+DECLARE FUNCTION ReadGuess (p, tk)
+DECLARE FUNCTION Title ()
+DECLARE SUB LevelPage ()
+DECLARE SUB Page (l1$, l2$)
+DECLARE SUB PlayGame ()
+DECLARE SUB Tutorial ()
 
-' g%: 0 empty, 1 wall, 2 mirror "/", 3 mirror "\", 4 target, 5 laser gun
-' directions d%: 0 right, 1 up, 2 left, 3 down
-DIM SHARED g%(1 TO 14, 1 TO 10)
-DIM SHARED ddx%(0 TO 3), ddy%(0 TO 3)
-DIM SHARED lh%(1 TO 5, 1 TO 7), lwx%(1 TO 5, 1 TO 6), lwy%(1 TO 5, 1 TO 6)
-DIM SHARED gx%, gy%, gd%, tx%, ty%, maxm%, mleft%, bounces%, hit%
-DIM SHARED cx%, cy%, lvl%, shots%, tot%, quit%
+CONST GX0 = 160, GY0 = 56, CW = 32, NSHOT = 20
 
-RANDOMIZE TIMER
-FOR i% = 0 TO 3
-  READ ddx%(i%), ddy%(i%)
-NEXT i%
-FOR n% = 1 TO 5
-  FOR k% = 1 TO 7
-    READ lh%(n%, k%)
-  NEXT k%
-  FOR w% = 1 TO lh%(n%, 7)
-    READ lwx%(n%, w%), lwy%(n%, w%)
-  NEXT w%
-NEXT n%
-' right, up, left, down as (dx,dy) on the screen grid (y grows downward)
-DATA 1,0, 0,-1, -1,0, 0,1
-' per level: gun x,y,dir, target x,y, mirrors allowed, wall count, then wall x,y pairs
-DATA 1,5,0, 10,2, 2, 2, 5,2, 6,8
-DATA 1,2,0, 12,9, 3, 3, 3,5, 8,5, 9,7
-DATA 14,10,2, 3,2, 4, 4, 8,10, 7,3, 6,8, 13,4
-DATA 1,10,1, 14,1, 3, 3, 1,5, 9,7, 3,3
-DATA 7,10,1, 11,5, 5, 4, 7,6, 5,5, 8,4, 13,8
+DIM SHARED SCORE AS LONG, HI AS LONG
+DIM SHARED MAZ(0 TO 9, 0 TO 9), SEEN(0 TO 9, 0 TO 9)
+DIM SHARED USED(10 TO 49), UCOL(10 TO 49)
+DIM SHARED PX(0 TO 200), PY(0 TO 200), NP
+DIM SHARED HCI(0 TO 200), HCJ(0 TO 200), NH
+DIM SHARED BPX(0 TO 20, 0 TO 200), BPY(0 TO 20, 0 TO 200)
+DIM SHARED BN(0 TO 20), BCOL(0 TO 20), BDASH(0 TO 20), NB
+DIM SHARED CT(0 TO 13)
+DIM SHARED LX(10 TO 49), LY(10 TO 49)
+DIM SHARED SXP(10 TO 49), SYP(10 TO 49), EPX(10 TO 49), EPY(10 TO 49)
+DIM SHARED ZX1(10 TO 49), ZY1(10 TO 49), ZX2(10 TO 49), ZY2(10 TO 49)
+DIM SHARED MSGT$(1 TO 3), MCOL(1 TO 3)
+DIM SHARED BTX(1 TO 5), BTY(1 TO 5), BTW(1 TO 5), BTH(1 TO 5)
+DIM SHARED BTT$(1 TO 5), BK1(1 TO 5), BK2(1 TO 5), NBTN
+DIM SHARED MC(0 TO 29), BOMB(1 TO 100)
+DIM SHARED HAVEMOUSE, MSHOWN, SOUNDON, SHOWMENU, ENDVIEW, SCRN, HOVP
+DIM SHARED MX, MY, PB, CLK, CLKX, CLKY
+DIM SHARED BB, EXITP, MISS, REFL, HIT, SHOTNO, GAMEOK, QUITTUT
+DIM SHARED LVL$, SOLDV, SOLDX, SOLDY, ALV, ALX, ALY
 
-SCREEN 12
-tot% = 0
-quit% = 0
-CALL Title
-IF quit% <> 0 THEN GOTO ExitGame
-FOR lvl% = 1 TO 5
-  CALL PlayLevel
-  IF quit% <> 0 THEN EXIT FOR
-NEXT lvl%
-IF quit% = 0 THEN CALL Finale
-
-ExitGame:
-SCREEN 0: WIDTH 80: COLOR 7, 0: CLS
-ON ERROR GOTO NoMenu
-RUN "MENU.BAS"
-NoMenu:
+'------------------------------------------------------------------------------
+'  MAIN
+'------------------------------------------------------------------------------
+Init
+DO
+  ch = Title
+  SELECT CASE ch
+    CASE 1
+      DO
+        PlayGame
+      LOOP WHILE GAMEOK = 1
+    CASE 2
+      Tutorial
+    CASE ELSE
+      EXIT DO
+  END SELECT
+LOOP
+SCREEN 0
+WIDTH 80
+COLOR 7
+CLS
+PRINT "THANKS FOR PLAYING LAZER MAZE"
 END
 
-SUB Delay (secs!)
-  t! = TIMER
-  DO
-    d! = TIMER - t!
-    IF d! < 0 THEN d! = d! + 86400
-  LOOP UNTIL d! >= secs!
+'  beam colors, then the machine code of the mouse routine (hex bytes)
+DATA 14,10,12,11,13,9,15,6,2,4,3,5,7,1
+DATA 55,89,E5,8B,5E,0C,8B,07,50,8B,5E,0A,8B,07,50,8B,5E,08,8B,0F,8B,5E,06
+DATA 8B,17,5B,58,1E,07,CD,33,53,8B,5E,0C,89,07,58,8B,5E,0A,89,07,8B,5E,08
+DATA 89,0F,8B,5E,06,89,17,5D,CA,08,00
+
+SUB AddBtn (x, y, w, h, t$, k1, k2)
+  NBTN = NBTN + 1
+  BTX(NBTN) = x: BTY(NBTN) = y: BTW(NBTN) = w: BTH(NBTN) = h
+  BTT$(NBTN) = t$: BK1(NBTN) = k1: BK2(NBTN) = k2
 END SUB
 
-' Draw one grid square with whatever it holds.
-SUB DrawCell (x%, y%)
-  IF x% < 1 OR x% > 14 OR y% < 1 OR y% > 10 THEN EXIT SUB
-  px% = 16 + (x% - 1) * 32
-  py% = 40 + (y% - 1) * 32
-  LINE (px%, py%)-(px% + 31, py% + 31), 0, BF
-  LINE (px%, py%)-(px% + 31, py% + 31), 1, B
-  SELECT CASE g%(x%, y%)
-    CASE 1
-      LINE (px% + 2, py% + 2)-(px% + 29, py% + 29), 8, BF
-      LINE (px% + 2, py% + 2)-(px% + 29, py% + 29), 7, B
-    CASE 2
-      LINE (px% + 6, py% + 26)-(px% + 26, py% + 6), 11
-      LINE (px% + 7, py% + 26)-(px% + 27, py% + 6), 11
-      LINE (px% + 5, py% + 26)-(px% + 25, py% + 6), 15
-    CASE 3
-      LINE (px% + 6, py% + 6)-(px% + 26, py% + 26), 11
-      LINE (px% + 5, py% + 6)-(px% + 25, py% + 26), 11
-      LINE (px% + 7, py% + 6)-(px% + 27, py% + 26), 15
-    CASE 4
-      CIRCLE (px% + 16, py% + 16), 12, 14
-      CIRCLE (px% + 16, py% + 16), 6, 12
-    CASE 5
-      LINE (px% + 4, py% + 4)-(px% + 27, py% + 27), 9, BF
-      mx% = px% + 16 + 14 * ddx%(gd%)
-      my% = py% + 16 + 14 * ddy%(gd%)
-      LINE (px% + 16, py% + 16)-(mx%, my%), 15
-      LINE (px% + 17, py% + 16)-(mx% + 1, my%), 15
-  END SELECT
+SUB AlienOff
+  IF ALV <> 0 THEN
+    MHide
+    EraseActor ALX, ALY
+    ALV = 0
+  END IF
 END SUB
 
-' Draw a short piece of beam from the centre of (x,y) to the edge of that square in direction d.
-SUB Half (x%, y%, d%)
-  px% = 16 + (x% - 1) * 32 + 16
-  py% = 40 + (y% - 1) * 32 + 16
-  LINE (px%, py%)-(px% + 16 * ddx%(d%), py% + 16 * ddy%(d%)), 12
+SUB AlienOn (x, y)
+  MHide
+  ALX = x: ALY = y: ALV = 1
+  DrawAlien x, y
 END SUB
 
-' Draw beam from centre of one square to centre of the next.
-SUB BeamSeg (x1%, y1%, x2%, y2%)
-  ax% = 16 + (x1% - 1) * 32 + 16
-  ay% = 40 + (y1% - 1) * 32 + 16
-  bx% = 16 + (x2% - 1) * 32 + 16
-  by% = 40 + (y2% - 1) * 32 + 16
-  LINE (ax%, ay%)-(bx%, by%), 12
-  LINE (ax% + 1, ay% + 1)-(bx% + 1, by% + 1), 12
-END SUB
-
-' Follow the beam from the gun square by square.  A "/" mirror swaps right<->up and left<->down,
-' a "\" mirror swaps right<->down and left<->up: the beam leaves at the same angle it arrived.
-' dr% <> 0 also draws the path.  Sets hit% and bounces%.
-SUB Trace (dr%)
-  x% = gx%
-  y% = gy%
-  d% = gd%
-  hit% = 0
-  bounces% = 0
-  n% = 0
-  DO
-    nx% = x% + ddx%(d%)
-    ny% = y% + ddy%(d%)
-    IF nx% < 1 OR nx% > 14 OR ny% < 1 OR ny% > 10 THEN
-      IF dr% <> 0 THEN CALL Half(x%, y%, d%)
-      EXIT DO
+SUB BuildMaze (n)
+  FOR i = 0 TO 9
+    FOR j = 0 TO 9
+      MAZ(i, j) = 0
+    NEXT
+  NEXT
+  cnt = 0
+  DO WHILE cnt < n
+    i = INT(RND * 10): j = INT(RND * 10)
+    IF MAZ(i, j) = 0 THEN
+      MAZ(i, j) = 1 + INT(RND * 2)
+      cnt = cnt + 1
     END IF
-    c% = g%(nx%, ny%)
-    IF c% = 1 OR c% = 5 THEN
-      IF dr% <> 0 THEN CALL Half(x%, y%, d%)
-      EXIT DO
-    END IF
-    IF dr% <> 0 THEN CALL BeamSeg(x%, y%, nx%, ny%)
-    IF c% = 4 THEN
-      hit% = 1
-      EXIT DO
-    END IF
-    IF c% = 2 THEN
-      IF d% MOD 2 = 0 THEN d% = d% + 1 ELSE d% = d% - 1
-      bounces% = bounces% + 1
-    ELSEIF c% = 3 THEN
-      d% = 3 - d%
-      bounces% = bounces% + 1
-    END IF
-    x% = nx%
-    y% = ny%
-    n% = n% + 1
-    IF n% > 300 THEN EXIT DO
   LOOP
 END SUB
 
-SUB Pr (r%, t$)
-  IF r% < 1 OR r% > 30 THEN EXIT SUB
-  LOCATE r%, 61
-  PRINT LEFT$(t$ + SPACE$(19), 19);
+SUB ClearBtns
+  IF NBTN > 0 THEN
+    MHide
+    FOR i = 1 TO NBTN
+      LINE (BTX(i), BTY(i))-(BTX(i) + BTW(i) - 1, BTY(i) + BTH(i) - 1), 0, BF
+    NEXT
+  END IF
+  NBTN = 0
 END SUB
 
-SUB Msg (t$)
-  LOCATE 27, 1
-  PRINT LEFT$(t$ + SPACE$(79), 79);
+SUB CText (r, t$, c)
+  COLOR c
+  LOCATE r, (80 - LEN(t$)) \ 2 + 1
+  PRINT t$;
 END SUB
 
-SUB DrawBoard
-  FOR x% = 1 TO 14
-    FOR y% = 1 TO 10
-      CALL DrawCell(x%, y%)
-    NEXT y%
-  NEXT x%
-  CALL Trace(1)
-  px% = 16 + (cx% - 1) * 32
-  py% = 40 + (cy% - 1) * 32
-  LINE (px% + 1, py% + 1)-(px% + 30, py% + 30), 15, B
+SUB Demo (p, c)
+  Trace p
+  SoldOn SXP(p), SYP(p)
+  DoShot p, EXITP, c, 0
+END SUB
+
+SUB DoShot (p, g, c, dash)
+  s = (p - 10) \ 10
+  alx = SXP(g): aly = SYP(g)
+  IF g = p THEN
+    IF s = 0 OR s = 2 THEN
+      alx = alx + 36
+    ELSE
+      aly = aly + 36
+    END IF
+  END IF
+  SoldOn SXP(p), SYP(p)
+  FOR f = 3000 TO 600 STEP -400
+    Snd f, 1
+  NEXT
+  AlienOn alx, aly              'the alien appears AFTER the soldier has fired
+
+  'beam flight
+  MHide
+  FOR n = 0 TO NP - 2
+    x1 = PX(n): y1 = PY(n): x2 = PX(n + 1): y2 = PY(n + 1)
+    dx! = x2 - x1: dy! = y2 - y1
+    seglen! = SQR(dx! * dx! + dy! * dy!)
+    steps = INT(seglen! / 16) + 1
+    px0 = x1: py0 = y1
+    FOR t = 1 TO steps
+      nx = x1 + CINT(dx! * t / steps)
+      ny = y1 + CINT(dy! * t / steps)
+      DrawSeg px0, py0, nx, ny, c, dash
+      px0 = nx: py0 = ny
+      Dly .01
+    NEXT
+    IF n < NP - 2 THEN Snd 1500, 1
+  NEXT
+
+  IF g = EXITP THEN
+    HIT = 1
+    ExplodeAt alx, aly
+  ELSE
+    HIT = 0
+    ThrowBomb alx, aly, SXP(p), SYP(p)
+    ExplodeAt SXP(p), SYP(p)
+  END IF
+  Dly .5
+  NB = NB + 1
+  FOR n = 0 TO NP - 1
+    BPX(NB, n) = PX(n): BPY(NB, n) = PY(n)
+  NEXT
+  BN(NB) = NP: BCOL(NB) = c: BDASH(NB) = dash
+  SOLDV = 0: ALV = 0
+  DrawGame
+END SUB
+
+SUB DrawAlien (cx, cy)
+  CIRCLE (cx, cy - 1), 9, 10
+  PAINT (cx, cy - 1), 10, 10
+  LINE (cx - 7, cy - 4)-(cx - 2, cy + 1), 0, BF
+  LINE (cx + 2, cy - 4)-(cx + 7, cy + 1), 0, BF
+  PSET (cx - 5, cy - 2), 15
+  PSET (cx + 5, cy - 2), 15
+  LINE (cx - 4, cy - 9)-(cx - 6, cy - 11), 10
+  LINE (cx + 4, cy - 9)-(cx + 6, cy - 11), 10
+  PSET (cx - 6, cy - 11), 12
+  PSET (cx + 6, cy - 11), 12
+  LINE (cx - 3, cy + 8)-(cx + 3, cy + 11), 2, BF
+  LINE (cx - 8, cy + 9)-(cx - 6, cy + 11), 2, BF
+  LINE (cx + 6, cy + 9)-(cx + 8, cy + 11), 2, BF
+END SUB
+
+SUB DrawBtn (i, hov)
+  DrawBtnXY BTX(i), BTY(i), BTW(i), BTH(i), BTT$(i), hov
+END SUB
+
+SUB DrawBtnXY (x, y, w, h, t$, hov)
+  MHide
+  LINE (x, y)-(x + w - 1, y + h - 1), 0, BF
+  IF hov <> 0 THEN
+    LINE (x, y)-(x + w - 1, y + h - 1), 15, B
+    LINE (x + 1, y + 1)-(x + w - 2, y + h - 2), 9, B
+    COLOR 14
+  ELSE
+    LINE (x, y)-(x + w - 1, y + h - 1), 11, B
+    COLOR 15
+  END IF
+  LOCATE ((y + (h - 16) \ 2) \ 16) + 1, ((x + (w - 8 * LEN(t$)) \ 2) \ 8) + 1
+  PRINT t$;
+END SUB
+
+SUB DrawGame
+  MHide
+  CLS
   COLOR 14
-  CALL Pr(3, "LEVEL" + STR$(lvl%) + " of 5")
-  COLOR 10
-  CALL Pr(5, "Mirrors left:" + STR$(mleft%))
-  CALL Pr(6, "Shots fired:" + STR$(shots%))
-  CALL Pr(7, "Score:" + STR$(tot%))
-  COLOR 12
-  CALL Pr(9, "Bounces:" + STR$(bounces%))
-  COLOR 7
-  CALL Pr(11, "Law of reflection:")
-  CALL Pr(12, "angle in = angle")
-  CALL Pr(13, "out. Each mirror")
-  CALL Pr(14, "sits at 45 deg, so")
-  CALL Pr(15, "the beam turns a")
-  CALL Pr(16, "right angle (90).")
-  CALL Pr(18, "Blue box = gun")
-  CALL Pr(19, "Gold ring = target")
-  CALL Pr(20, "Grey = wall")
-  CALL Pr(21, "Red line = laser")
+  LOCATE 1, 1
+  PRINT "LAZER MAZE";
+
+  'board
+  LINE (GX0 - 1, GY0 - 1)-(GX0 + 320, GY0 + 320), 15, B
+  FOR i = 1 TO 9
+    LINE (GX0 + i * CW, GY0)-(GX0 + i * CW, GY0 + 319), 8
+    LINE (GX0, GY0 + i * CW)-(GX0 + 319, GY0 + i * CW), 8
+  NEXT
+
+  'beams already fired
+  FOR b = 1 TO NB
+    FOR n = 0 TO BN(b) - 2
+      DrawSeg BPX(b, n), BPY(b, n), BPX(b, n + 1), BPY(b, n + 1), BCOL(b), BDASH(b)
+    NEXT
+  NEXT
+
+  'reflectors (drawn over the beams)
+  FOR i = 0 TO 9
+    FOR j = 0 TO 9
+      IF MAZ(i, j) <> 0 THEN
+        c = 15
+        IF ENDVIEW <> 0 AND SEEN(i, j) = 0 THEN c = 14
+        DrawMirror i, j, MAZ(i, j), c
+      END IF
+    NEXT
+  NEXT
+
+  'ports
+  FOR p = 10 TO 49
+    DrawLabel p, 0
+  NEXT
+
+  'actors
+  IF SOLDV <> 0 THEN DrawSoldier SOLDX, SOLDY
+  IF ALV <> 0 THEN DrawAlien ALX, ALY
+
+  DrawStats
+
+  'message panel
+  LINE (4, 428)-(635, 479), 8, B
+  FOR l = 1 TO 3
+    ShowMsg l
+  NEXT
+
+  DrawSide
+  FOR i = 1 TO NBTN
+    DrawBtn i, 0
+  NEXT
 END SUB
 
-SUB LoadLevel (n%)
-  FOR x% = 1 TO 14
-    FOR y% = 1 TO 10
-      g%(x%, y%) = 0
-    NEXT y%
-  NEXT x%
-  IF n% < 1 OR n% > 5 THEN EXIT SUB
-  gx% = lh%(n%, 1)
-  gy% = lh%(n%, 2)
-  gd% = lh%(n%, 3)
-  tx% = lh%(n%, 4)
-  ty% = lh%(n%, 5)
-  maxm% = lh%(n%, 6)
-  FOR w% = 1 TO lh%(n%, 7)
-    wx% = lwx%(n%, w%)
-    wy% = lwy%(n%, w%)
-    IF wx% >= 1 AND wx% <= 14 AND wy% >= 1 AND wy% <= 10 THEN g%(wx%, wy%) = 1
-  NEXT w%
-  g%(tx%, ty%) = 4
-  g%(gx%, gy%) = 5
-  mleft% = maxm%
+SUB DrawLabel (p, hl)
+  x = LX(p): y = LY(p)
+  MHide
+  LINE (x - 3, y - 1)-(x + 18, y + 16), 0, BF
+  IF hl <> 0 THEN
+    LINE (x - 3, y - 1)-(x + 18, y + 16), 15, B
+    LINE (x - 2, y)-(x + 17, y + 15), 14, B
+    fg = 15
+  ELSE
+    IF UCOL(p) = 0 THEN
+      bc = 8: fg = 7
+    ELSE
+      bc = UCOL(p): fg = UCOL(p)
+    END IF
+    LINE (x - 3, y - 1)-(x + 18, y + 16), bc, B
+  END IF
+  COLOR fg
+  LOCATE y \ 16 + 1, x \ 8 + 1
+  PRINT LTRIM$(STR$(p));
 END SUB
 
-FUNCTION GetKey$ ()
+SUB DrawLevel
+  MHide
+  CLS
+  CText 8, "L A Z E R   M A Z E", 14
+  CText 12, "YOU NOW QUALIFY FOR " + LVL$, 15
+  CText 14, "WITH " + Num$(REFL) + " REFLECTORS", 15
+  CText 17, "THERE ARE " + Num$(NSHOT) + " BEAMS IN EACH GAME", 7
+  DrawSide
+END SUB
+
+SUB DrawMirror (i, j, kind, c)
+  x = GX0 + i * CW: y = GY0 + j * CW
+  IF kind = 1 THEN
+    LINE (x + 6, y + 26)-(x + 26, y + 6), c
+    LINE (x + 7, y + 26)-(x + 27, y + 6), c
+  ELSE
+    LINE (x + 6, y + 6)-(x + 26, y + 26), c
+    LINE (x + 7, y + 6)-(x + 27, y + 26), c
+  END IF
+END SUB
+
+SUB DrawSeg (x1, y1, x2, y2, c, dash)
+  IF dash <> 0 THEN
+    LINE (x1, y1)-(x2, y2), c, , &HF0F0
+  ELSE
+    LINE (x1, y1)-(x2, y2), c
+    LINE (x1 + 1, y1 + 1)-(x2 + 1, y2 + 1), c
+  END IF
+END SUB
+
+SUB DrawSide
+  MHide
+  IF SOUNDON <> 0 THEN t$ = "SOUND ON" ELSE t$ = "SOUND OFF"
+  DrawBtnXY 556, 64, 80, 24, t$, 0
+  IF SHOWMENU <> 0 THEN DrawBtnXY 556, 96, 80, 24, "MENU", 0
+END SUB
+
+SUB DrawSoldier (cx, cy)
+  LINE (cx - 6, cy - 11)-(cx + 6, cy - 8), 2, BF
+  LINE (cx - 7, cy - 8)-(cx + 7, cy - 7), 10, BF
+  LINE (cx - 5, cy - 6)-(cx + 5, cy - 1), 14, BF
+  PSET (cx - 2, cy - 4), 0
+  PSET (cx + 2, cy - 4), 0
+  LINE (cx - 6, cy)-(cx + 6, cy + 7), 2, BF
+  LINE (cx - 6, cy + 4)-(cx + 6, cy + 4), 6
+  LINE (cx - 10, cy)-(cx - 8, cy + 6), 2, BF
+  LINE (cx + 8, cy + 1)-(cx + 10, cy + 5), 2, BF
+  LINE (cx + 8, cy + 3)-(cx + 11, cy + 3), 7
+  LINE (cx - 5, cy + 8)-(cx - 2, cy + 11), 10, BF
+  LINE (cx + 2, cy + 8)-(cx + 5, cy + 11), 10, BF
+END SUB
+
+SUB DrawStats
+  MHide
+  PutStat 4, "SHOT", Num$(SHOTNO) + "/" + Num$(NSHOT), 14
+  PutStat 7, "SCORE", NumL$(SCORE), 15
+  PutStat 10, "HIGH", NumL$(HI), 11
+  PutStat 13, "REFLECTORS", Num$(REFL), 10
+  IF MISS > 0 THEN mc = 12 ELSE mc = 7
+  PutStat 16, "MISSES", Num$(MISS), mc
+END SUB
+
+SUB DrawTitle
+  MHide
+  CLS
+  CText 2, "L A Z E R   M A Z E", 14
+  CText 4, "A GAME FOR SHARP EYES AND QUICK WITS", 11
+  CText 6, "Remake of the 1982 Apple II game by James Spain", 7
+  'little demo beam
+  c = 12
+  FOR k = 0 TO 1
+    LINE (104, 146 + k)-(200, 146 + k), c
+    LINE (200 + k, 146)-(200 + k, 121), c
+    LINE (200, 121 + k)-(440, 121 + k), c
+    LINE (440 + k, 121)-(440 + k, 146), c
+    LINE (440, 146 + k)-(536, 146 + k), c
+  NEXT
+  LINE (192, 158)-(208, 142), 15
+  LINE (192, 133)-(208, 117), 15
+  LINE (432, 117)-(448, 133), 15
+  LINE (432, 142)-(448, 158), 15
+  DrawSoldier 90, 146
+  DrawAlien 550, 146
+  CText 12, "WHAT DO YOU WANT TO DO?", 15
+  CText 24, "Mouse: click the buttons / click a port to answer", 7
+  CText 25, "F2 = sound on/off      ESC = leave a game", 8
+  DrawSide
+END SUB
+
+SUB Dly (s!)
+  t0! = TIMER
   DO
-    k$ = INKEY$
-  LOOP WHILE k$ = ""
+    t! = TIMER - t0!
+    IF t! < 0 THEN t! = t! + 86400!
+  LOOP WHILE t! < s!
+END SUB
+
+SUB EraseActor (cx, cy)
+  LINE (cx - 12, cy - 12)-(cx + 12, cy + 12), 0, BF
+END SUB
+
+SUB ExplodeAt (x, y)
+  MHide
+  CIRCLE (x, y), 5, 14
+  PAINT (x, y), 14, 14
+  Snd 120, 1
+  CIRCLE (x, y), 12, 12
+  PAINT (x, y), 12, 12
+  CIRCLE (x, y), 6, 14
+  PAINT (x, y), 14, 14
+  Snd 90, 1
+  FOR k = 0 TO 7
+    a! = k * 3.14159 / 4
+    LINE (x, y)-(x + CINT(20 * COS(a!)), y + CINT(20 * SIN(a!))), 14
+  NEXT
+  CIRCLE (x, y), 9, 4
+  PAINT (x, y), 4, 4
+  CIRCLE (x, y), 4, 14
+  PAINT (x, y), 14, 14
+  FOR n = 1 TO 6
+    Snd 60 + INT(RND * 300), 1
+  NEXT
+  Dly .2
+END SUB
+
+SUB FlushIn
+  PollMouse
+  CLK = 0
+  DO WHILE INKEY$ <> ""
+  LOOP
+END SUB
+
+FUNCTION GetKey$
+  k$ = INKEY$
+  IF LEN(k$) = 2 THEN
+    IF ASC(RIGHT$(k$, 1)) = 60 THEN
+      SOUNDON = 1 - SOUNDON
+      DrawSide
+    END IF
+    k$ = ""
+  END IF
   GetKey$ = k$
 END FUNCTION
 
-SUB PlayLevel
-  CALL LoadLevel(lvl%)
-  cx% = 4
-  cy% = 5
-  IF g%(cx%, cy%) <> 0 THEN cx% = 3
-  shots% = 0
+SUB Init
+  SCREEN 12
+  RANDOMIZE TIMER
+  FOR i = 0 TO 13
+    READ CT(i)
+  NEXT
+  'load the mouse machine code
+  DEF SEG = VARSEG(MC(0))
+  FOR i = 0 TO 56
+    READ h$
+    POKE VARPTR(MC(0)) + i, VAL("&H" + h$)
+  NEXT
+  DEF SEG
+  'is there a mouse driver?
+  HAVEMOUSE = 1
+  DEF SEG = 0
+  IF PEEK(&HCC) + PEEK(&HCD) + PEEK(&HCE) + PEEK(&HCF) = 0 THEN HAVEMOUSE = 0
+  DEF SEG
+  IF HAVEMOUSE <> 0 THEN
+    a = 0: b = 0: c = 0: d = 0
+    Mouse a, b, c, d
+    IF a = 0 THEN HAVEMOUSE = 0
+  END IF
+  MSHOWN = 0: MX = -1: MY = -1: PB = 0: CLK = 0
+
+  'port geometry
+  FOR p = 10 TO 49
+    s = (p - 10) \ 10: k = (p - 10) MOD 10
+    SELECT CASE s
+      CASE 0
+        LX(p) = 168 + 32 * k: LY(p) = 32
+        SXP(p) = LX(p) + 8: SYP(p) = 14
+        EPX(p) = SXP(p): EPY(p) = 27
+        ZX1(p) = GX0 + 32 * k: ZY1(p) = 0: ZX2(p) = ZX1(p) + 31: ZY2(p) = GY0 - 1
+      CASE 1
+        LX(p) = 128: LY(p) = 64 + 32 * k
+        SXP(p) = 100: SYP(p) = LY(p) + 8
+        EPX(p) = 114: EPY(p) = SYP(p)
+        ZX1(p) = 84: ZY1(p) = GY0 + 32 * k: ZX2(p) = GX0 - 1: ZY2(p) = ZY1(p) + 31
+      CASE 2
+        LX(p) = 168 + 32 * k: LY(p) = 384
+        SXP(p) = LX(p) + 8: SYP(p) = 414
+        EPX(p) = SXP(p): EPY(p) = 401
+        ZX1(p) = GX0 + 32 * k: ZY1(p) = GY0 + 321: ZX2(p) = ZX1(p) + 31: ZY2(p) = 426
+      CASE ELSE
+        LX(p) = 496: LY(p) = 64 + 32 * k
+        SXP(p) = 540: SYP(p) = LY(p) + 8
+        EPX(p) = 526: EPY(p) = SYP(p)
+        ZX1(p) = GX0 + 321: ZY1(p) = GY0 + 32 * k: ZX2(p) = 549: ZY2(p) = ZY1(p) + 31
+    END SELECT
+  NEXT
+
+  'bomb sprite for XOR animation
   CLS
-  COLOR 15
-  LOCATE 1, 1: PRINT "G24 Laser Maze (LEI SHE MI GONG)";
-  COLOR 7
-  LOCATE 30, 1: PRINT "Arrows move  / \ place  X remove  ENTER fire  R clear  ESC = menu";
-  CALL DrawBoard
-  CALL Msg("Guide the laser onto the target with mirrors. Place / or \ then press ENTER.")
-  DO
-    k$ = GetKey$
-    redraw% = 0
-    IF k$ = CHR$(27) THEN
-      quit% = 1
+  CIRCLE (8, 10), 6, 8
+  PAINT (8, 10), 7, 8
+  LINE (8, 4)-(12, 0), 14
+  PSET (12, 0), 12
+  GET (0, 0)-(15, 16), BOMB
+  CLS
+
+  SOUNDON = 1
+  REFL = 20
+  LVL$ = "A BEGINNERS LEVEL GAME"
+  SCORE = 7000: HI = 0
+END SUB
+
+SUB LevelPage
+  SCRN = 2: SHOWMENU = 1
+  StatusReset
+  ClearBtns
+  DrawLevel
+  AddBtn 270, 296, 100, 32, "START", 13, 0
+  r = WaitChoice
+  ClearBtns
+  IF r < 0 THEN GAMEOK = 0
+END SUB
+
+SUB MHide
+  IF HAVEMOUSE = 0 THEN EXIT SUB
+  IF MSHOWN <> 0 THEN
+    a = 2: b = 0: c = 0: d = 0
+    Mouse a, b, c, d
+    MSHOWN = 0
+  END IF
+END SUB
+
+SUB Mouse (a, b, c, d)
+  DEF SEG = VARSEG(MC(0))
+  CALL ABSOLUTE(a, b, c, d, VARPTR(MC(0)))
+  DEF SEG
+END SUB
+
+SUB Msg (l, t$, c)
+  MSGT$(l) = t$
+  MCOL(l) = c
+  IF SCRN = 3 THEN ShowMsg l
+END SUB
+
+SUB MShow
+  IF HAVEMOUSE = 0 THEN EXIT SUB
+  IF MSHOWN = 0 THEN
+    a = 1: b = 0: c = 0: d = 0
+    Mouse a, b, c, d
+    MSHOWN = 1
+  END IF
+END SUB
+
+FUNCTION Num$ (v)
+  Num$ = LTRIM$(STR$(v))
+END FUNCTION
+
+FUNCTION NumL$ (v AS LONG)
+  NumL$ = LTRIM$(STR$(v))
+END FUNCTION
+
+SUB Page (l1$, l2$)
+  Msg 1, l1$, 15
+  Msg 2, l2$, 15
+  Msg 3, "", 15
+  ClearBtns
+  AddBtn 556, 296, 80, 32, "NEXT >", 13, 0
+  r = WaitChoice
+  ClearBtns
+  IF r < 0 THEN QUITTUT = 1
+END SUB
+
+SUB PlayGame
+  GAMEOK = 1
+  LevelPage
+  IF GAMEOK = 0 THEN EXIT SUB
+  SCORE = 7000: MISS = 0: SHOTNO = 0
+  FOR i = 0 TO 9
+    FOR j = 0 TO 9
+      SEEN(i, j) = 0
+    NEXT
+  NEXT
+  BuildMaze REFL
+  ResetBoardView
+
+  FOR shot = 1 TO NSHOT
+    SHOTNO = shot
+    DrawStats
+    StatusReset
+    DO
+      p = 10 + INT(RND * 40)
+    LOOP WHILE USED(p) <> 0
+    USED(p) = 1
+    Trace p
+    USED(EXITP) = 1
+    c = CT((shot - 1) MOD 14)
+    dash = 0
+    IF shot > 14 THEN dash = 1
+    tk = 1
+    g = ReadGuess(p, tk)
+    IF g < 0 THEN
+      Msg 2, "GAME ABORTED", 12
+      SoldOff
+      Dly 1
+      GAMEOK = 0
       EXIT SUB
-    ELSEIF LEN(k$) = 2 THEN
-      redraw% = 1
-      SELECT CASE RIGHT$(k$, 1)
-        CASE "H"
-          IF cy% > 1 THEN cy% = cy% - 1
-        CASE "P"
-          IF cy% < 10 THEN cy% = cy% + 1
-        CASE "K"
-          IF cx% > 1 THEN cx% = cx% - 1
-        CASE "M"
-          IF cx% < 14 THEN cx% = cx% + 1
-        CASE ELSE
-          redraw% = 0
-      END SELECT
-    ELSEIF k$ = "/" OR k$ = "\" THEN
-      IF g%(cx%, cy%) = 0 AND mleft% > 0 THEN
-        IF k$ = "/" THEN g%(cx%, cy%) = 2 ELSE g%(cx%, cy%) = 3
-        mleft% = mleft% - 1
-        CALL Msg("Mirror placed. The red line shows where the beam goes now.")
-      ELSEIF g%(cx%, cy%) = 0 THEN
-        CALL Msg("No mirrors left. Remove one with X first.")
-      ELSE
-        CALL Msg("That square is not empty.")
+    END IF
+    Msg 2, "", 15
+    DoShot p, g, c, dash
+    FOR n = 0 TO NH - 1
+      SEEN(HCI(n), HCJ(n)) = 1
+    NEXT
+    UCOL(p) = c: UCOL(EXITP) = c
+    DrawLabel p, 0
+    DrawLabel EXITP, 0
+
+    bs& = 0
+    Msg 2, "", 15
+    IF HIT = 1 THEN
+      IF BB > 10 THEN
+        bu = BB * 30
+        bs& = bs& + bu
+        Msg 2, "BONUS !!    " + Num$(bu) + " POINTS    !! BONUS", 14
+        FOR n = 1 TO 8
+          Snd 1000 + n * 100, 1
+        NEXT
+      ELSEIF BB > 6 THEN
+        bs& = bs& + 200
+        Msg 2, "200 POINTS !!!!! BONUS !!!! 200 POINTS", 14
+        FOR n = 1 TO 4
+          Snd 1000 + n * 150, 1
+        NEXT
       END IF
-      redraw% = 1
-    ELSEIF k$ = "x" OR k$ = "X" OR k$ = " " THEN
-      IF g%(cx%, cy%) = 2 OR g%(cx%, cy%) = 3 THEN
-        g%(cx%, cy%) = 0
-        mleft% = mleft% + 1
-        CALL Msg("Mirror removed.")
-      END IF
-      redraw% = 1
-    ELSEIF k$ = "r" OR k$ = "R" THEN
-      FOR x% = 1 TO 14
-        FOR y% = 1 TO 10
-          IF g%(x%, y%) = 2 OR g%(x%, y%) = 3 THEN g%(x%, y%) = 0
-        NEXT y%
-      NEXT x%
-      mleft% = maxm%
-      CALL Msg("All mirrors cleared.")
-      redraw% = 1
-    ELSEIF k$ = CHR$(13) THEN
-      shots% = shots% + 1
-      CALL Trace(0)
-      IF hit% <> 0 THEN
-        pts% = 100 - 10 * (shots% - 1)
-        IF pts% < 30 THEN pts% = 30
-        pts% = pts% + 10 * mleft%
-        tot% = tot% + pts%
-        CALL DrawBoard
-        CALL Delay(.3)
-        m$ = "TARGET HIT after" + STR$(bounces%) + " reflections! +"
-        CALL Msg(m$ + LTRIM$(STR$(pts%)) + " points.")
-        LOCATE 28, 1: PRINT "Press any key for the next level, ESC = menu";
-        k$ = GetKey$
-        IF k$ = CHR$(27) THEN quit% = 1
+      bs& = bs& + (2000& * BB) \ tk
+      Msg 1, "GOOD CALL......GOOD CALL......GOOD CALL", 10
+      Snd 523, 2
+      Snd 659, 2
+      Snd 784, 2
+      Snd 1047, 4
+    ELSE
+      MISS = MISS + 1
+      Msg 1, "SORRY...YOU MISSED", 12
+      Msg 2, "BEAM CAME OUT AT " + Num$(EXITP), 12
+      Snd 220, 4
+      Snd 165, 6
+    END IF
+    SCORE = SCORE + bs&
+    DrawStats
+    Msg 3, "BEAM SCORE = " + NumL$(bs&) + "    TOTAL = " + NumL$(SCORE), 11
+    Dly 1.8
+
+    IF HIT = 0 AND MISS = 3 THEN
+      Msg 2, "WANT TO REVIEW THE INSTRUCTIONS (Y/N)?", 15
+      ClearBtns
+      AddBtn 556, 296, 80, 32, "YES", ASC("Y"), 0
+      AddBtn 556, 344, 80, 32, "NO", ASC("N"), 0
+      r = WaitChoice
+      ClearBtns
+      IF r = 1 THEN
+        Tutorial
+        GAMEOK = 0
         EXIT SUB
-      ELSE
-        CALL Msg("Missed: the beam never reached the target. Move a mirror and fire again.")
-        redraw% = 1
       END IF
     END IF
-    IF redraw% <> 0 THEN CALL DrawBoard
+  NEXT
+
+  StatusReset
+  IF MISS = 0 THEN
+    bn& = 20& * REFL
+    SCORE = SCORE + bn&
+    Msg 1, "NO MISSES !!! BONUS " + NumL$(bn&) + " !!! NO MISSES", 14
+    FOR n = 1 TO 12
+      Snd 800 + n * 80, 1
+    NEXT
+  END IF
+  IF SCORE > HI THEN HI = SCORE
+  ENDVIEW = 1                    'untouched baffles turn yellow
+  DrawGame
+  Msg 2, "GAME COMPLETE...YOUR SCORE WAS " + NumL$(SCORE) + "  (UNTOUCHED BAFFLES: YELLOW)", 15
+  Msg 3, "THE HIGHEST SCORE IS " + NumL$(HI), 10
+  ClearBtns
+  AddBtn 556, 296, 80, 32, "NEXT GAME", 13, 0
+  r = WaitChoice
+  ClearBtns
+  IF r < 0 THEN GAMEOK = 0
+  IF SCORE > 3000 THEN REFL = 30: LVL$ = "A HIGHER LEVEL GAME"
+  IF SCORE > 4000 THEN REFL = 40: LVL$ = "AN INTERMEDIATE LEVEL GAME"
+  IF SCORE > 5000 THEN REFL = 50: LVL$ = "A HIGH LEVEL GAME"
+  IF SCORE > 6000 THEN REFL = 60: LVL$ = "A MASTER'S LEVEL GAME"
+  IF SCORE > 7000 THEN REFL = 70: LVL$ = "A MASTER'S LEVEL GAME"
+END SUB
+
+SUB PollMouse
+  IF HAVEMOUSE = 0 THEN EXIT SUB
+  a = 3: b = 0: c = 0: d = 0
+  Mouse a, b, c, d
+  MX = c: MY = d
+  IF (b AND 1) <> 0 THEN
+    IF PB = 0 THEN
+      CLK = 1: CLKX = c: CLKY = d
+    END IF
+    PB = 1
+  ELSE
+    PB = 0
+  END IF
+END SUB
+
+FUNCTION PortAt (x, y)
+  r = 0
+  FOR p = 10 TO 49
+    IF x >= ZX1(p) AND x <= ZX2(p) AND y >= ZY1(p) AND y <= ZY2(p) THEN r = p
+  NEXT
+  PortAt = r
+END FUNCTION
+
+SUB PutStat (r, l$, v$, c)
+  COLOR 8
+  LOCATE r, 1
+  PRINT l$ + SPACE$(11 - LEN(l$));
+  COLOR c
+  LOCATE r + 1, 1
+  PRINT LEFT$(v$ + SPACE$(11), 11);
+END SUB
+
+FUNCTION ReadGuess (p, tk)
+  SoldOn SXP(p), SYP(p)
+  FlushIn
+  ClearBtns
+  pr$ = "WHAT IS THE OUTPUT OF LAZER NO. " + Num$(p) + " ? "
+  Msg 1, pr$, 15
+  Msg 2, "CLICK THE PORT WHERE THE BEAM COMES OUT  (OR TYPE ITS 2 DIGITS)", 7
+  HOVP = 0
+  d$ = "": res = 0: done = 0
+  t0! = TIMER: lb! = TIMER
+  DO
+    PollMouse
+    MShow
+    IF CLK <> 0 THEN
+      CLK = 0
+      s = SideHit(CLKX, CLKY)
+      IF s = 2 THEN
+        res = -1: done = 1
+      ELSEIF s = 0 THEN
+        q = PortAt(CLKX, CLKY)
+        IF q > 0 THEN res = q: done = 1
+      END IF
+    END IF
+    IF done = 0 THEN
+      k$ = GetKey$
+      IF k$ <> "" THEN
+        kc = ASC(k$)
+        IF kc = 27 THEN
+          res = -1: done = 1
+        ELSEIF kc = 8 THEN
+          d$ = ""
+          Msg 1, pr$, 15
+        ELSEIF kc >= 48 AND kc <= 57 THEN
+          IF d$ = "" THEN
+            IF kc >= 49 AND kc <= 52 THEN
+              d$ = k$
+            ELSE
+              Snd 800, 4
+            END IF
+          ELSE
+            d$ = d$ + k$
+          END IF
+          Msg 1, pr$ + d$, 15
+          IF LEN(d$) = 2 THEN res = VAL(d$): done = 1
+        ELSE
+          Snd 800, 4
+        END IF
+      END IF
+    END IF
+    IF done = 0 THEN
+      'hover highlight of the port under the mouse
+      q = PortAt(MX, MY)
+      IF q <> HOVP THEN
+        MHide
+        IF HOVP > 0 THEN DrawLabel HOVP, 0
+        IF q > 0 THEN DrawLabel q, 1
+        HOVP = q
+      END IF
+      'blinking soldier
+      IF TIMER - lb! > .3 OR TIMER < lb! THEN
+        MHide
+        IF SOLDV <> 0 THEN SoldOff ELSE SoldOn SXP(p), SYP(p)
+        lb! = TIMER
+      END IF
+    END IF
+  LOOP UNTIL done <> 0
+  MHide
+  IF HOVP > 0 THEN DrawLabel HOVP, 0
+  HOVP = 0
+  IF SOLDV = 0 THEN SoldOn SXP(p), SYP(p)
+  el! = TIMER - t0!
+  IF el! < 0 THEN el! = el! + 86400!
+  IF el! > 3000 THEN el! = 3000
+  tk = INT(el! * 10) + 1
+  ReadGuess = res
+END FUNCTION
+
+SUB ResetBoardView
+  NB = 0
+  SOLDV = 0: ALV = 0
+  ENDVIEW = 0
+  FOR p = 10 TO 49
+    USED(p) = 0: UCOL(p) = 0
+  NEXT
+  SCRN = 3
+  SHOWMENU = 1
+  ClearBtns
+  DrawGame
+END SUB
+
+SUB ShowMsg (l)
+  r = 27 + l
+  COLOR 15
+  LOCATE r, 2
+  PRINT SPACE$(76);
+  COLOR MCOL(l)
+  LOCATE r, 2
+  PRINT LEFT$(MSGT$(l), 76);
+END SUB
+
+FUNCTION SideHit (x, y)
+  SideHit = 0
+  IF x >= 556 AND x < 636 AND y >= 64 AND y < 88 THEN
+    SOUNDON = 1 - SOUNDON
+    DrawSide
+    SideHit = 1
+    EXIT FUNCTION
+  END IF
+  IF SHOWMENU <> 0 AND x >= 556 AND x < 636 AND y >= 96 AND y < 120 THEN SideHit = 2
+END FUNCTION
+
+SUB SoldOff
+  IF SOLDV <> 0 THEN
+    MHide
+    EraseActor SOLDX, SOLDY
+    SOLDV = 0
+  END IF
+END SUB
+
+SUB SoldOn (x, y)
+  MHide
+  SOLDX = x: SOLDY = y: SOLDV = 1
+  DrawSoldier x, y
+END SUB
+
+SUB Snd (f, t)
+  IF SOUNDON = 0 THEN EXIT SUB
+  ff = f
+  IF ff < 37 THEN ff = 37
+  IF ff > 32767 THEN ff = 32767
+  SOUND ff, t
+END SUB
+
+SUB StatusReset
+  FOR i = 1 TO 3
+    Msg i, "", 15
+  NEXT
+END SUB
+
+SUB ThrowBomb (x1, y1, x2, y2)
+  MHide
+  dx! = x2 - x1: dy! = y2 - y1
+  dist! = SQR(dx! * dx! + dy! * dy!)
+  ns = INT(dist! / 14)
+  IF ns < 1 THEN ns = 1
+  FOR n = 0 TO ns
+    bxx = x1 + CINT(dx! * n / ns)
+    byy = y1 + CINT(dy! * n / ns)
+    PUT (bxx - 8, byy - 9), BOMB, XOR
+    Snd 300 + (ns - n) * 15, 1
+    Dly .02
+    PUT (bxx - 8, byy - 9), BOMB, XOR
+  NEXT
+END SUB
+
+FUNCTION Title
+  SCRN = 0: SHOWMENU = 0: NB = 0
+  StatusReset
+  ClearBtns
+  DrawTitle
+  AddBtn 220, 216, 200, 32, "1) PLAY THE GAME", ASC("1"), ASC("P")
+  AddBtn 220, 264, 200, 32, "2) INSTRUCTIONS", ASC("2"), ASC("I")
+  AddBtn 220, 312, 200, 32, "3) QUIT", ASC("3"), ASC("Q")
+  DO
+    r = WaitChoice
+    IF r > 0 THEN EXIT DO
   LOOP
+  ClearBtns
+  Title = r
+END FUNCTION
+
+SUB Trace (p)
+  s = (p - 10) \ 10: k = (p - 10) MOD 10
+  SELECT CASE s
+    CASE 0
+      i = k: j = 0: di = 0: dj = 1
+    CASE 1
+      i = 0: j = k: di = 1: dj = 0
+    CASE 2
+      i = k: j = 9: di = 0: dj = -1
+    CASE ELSE
+      i = 9: j = k: di = -1: dj = 0
+  END SELECT
+  PX(0) = EPX(p): PY(0) = EPY(p): NP = 1
+  BB = 0: NH = 0
+  DO WHILE i >= 0 AND i <= 9 AND j >= 0 AND j <= 9
+    IF MAZ(i, j) <> 0 THEN
+      BB = BB + 1
+      HCI(NH) = i: HCJ(NH) = j: NH = NH + 1
+      PX(NP) = GX0 + i * CW + 16
+      PY(NP) = GY0 + j * CW + 16
+      NP = NP + 1
+      t = di
+      IF MAZ(i, j) = 1 THEN
+        di = -dj: dj = -t
+      ELSE
+        di = dj: dj = t
+      END IF
+    END IF
+    i = i + di: j = j + dj
+  LOOP
+  IF j < 0 THEN
+    EXITP = 10 + i
+  ELSEIF i < 0 THEN
+    EXITP = 20 + j
+  ELSEIF j > 9 THEN
+    EXITP = 30 + i
+  ELSE
+    EXITP = 40 + j
+  END IF
+  PX(NP) = EPX(EXITP): PY(NP) = EPY(EXITP): NP = NP + 1
+  BB = BB + 1
 END SUB
 
-SUB Finale
-  CLS
-  COLOR 14
-  LOCATE 6, 20: PRINT "ALL FIVE MAZES SOLVED!"
-  COLOR 15
-  LOCATE 9, 20: PRINT "Final score:"; tot%
-  COLOR 7
-  LOCATE 12, 12: PRINT "Remember: a mirror sends the beam away at the same angle it came in."
-  LOCATE 13, 12: PRINT "(angle of incidence = angle of reflection)"
-  COLOR 10
-  LOCATE 16, 12: PRINT "Press any key to return to the menu..."
-  k$ = GetKey$
+SUB Tutorial
+  QUITTUT = 0
+  FOR i = 0 TO 9
+    FOR j = 0 TO 9
+      MAZ(i, j) = 0
+    NEXT
+  NEXT
+  MAZ(3, 5) = 1: MAZ(5, 4) = 2: MAZ(9, 5) = 1: MAZ(5, 8) = 2: MAZ(6, 5) = 1
+  MAZ(1, 2) = 1: MAZ(2, 8) = 1: MAZ(5, 1) = 2: MAZ(8, 2) = 2: MAZ(8, 9) = 2
+  ResetBoardView
+  SHOTNO = 0
+  StatusReset
+  Page "EACH NUMBER AROUND THE BOX IS A PLACE WHERE A LASER BEAM CAN ENTER OR EXIT.", "THE SOLDIER FIRES FROM THE ENTRY NUMBER; YOU CLICK THE EXIT."
+  IF QUITTUT <> 0 THEN EXIT SUB
+  Page "THE SLANTED LINES ARE REFLECTIVE BAFFLES.  THEY BEND THE BEAM TO THE", "RIGHT, LEFT, UP OR DOWN.  THE BAFFLES ARE ALWAYS VISIBLE."
+  IF QUITTUT <> 0 THEN EXIT SUB
+  StatusReset
+  Msg 1, "WATCH A BEAM ENTER AT 22...", 15
+  Demo 22, CT(0)
+  Page "IT HITS A BAFFLE AND TURNS STRAIGHT UP TO COME OUT AT 11.", ""
+  IF QUITTUT <> 0 THEN EXIT SUB
+  StatusReset
+  Msg 1, "NOW A BEAM ENTERING AT 20...", 15
+  Demo 20, CT(1)
+  Page "IT DOES NOT HIT ANY BAFFLE AND SIMPLY EXITS AT 40.", "NOW YOU TRY SOME.  CLICK THE EXIT PORT OF EACH BEAM."
+  IF QUITTUT <> 0 THEN EXIT SUB
+  FOR q = 1 TO 5
+    SELECT CASE q
+      CASE 1: p = 29
+      CASE 2: p = 15
+      CASE 3: p = 39
+      CASE 4: p = 33
+      CASE ELSE: p = 31
+    END SELECT
+    StatusReset
+    Trace p
+    tk = 1
+    g = ReadGuess(p, tk)
+    IF g < 0 THEN
+      SoldOff
+      EXIT SUB
+    END IF
+    DoShot p, g, CT(1 + q), 0
+    IF HIT = 1 THEN
+      Msg 1, "GOOD CALL!  BEAM " + Num$(p) + " COMES OUT AT " + Num$(EXITP) + ".", 10
+    ELSE
+      Msg 1, "NOT QUITE.  BEAM " + Num$(p) + " COMES OUT AT " + Num$(EXITP) + ".", 12
+    END IF
+    Dly 2
+  NEXT
+  Page "BEAM SCORE DEPENDS ON BAFFLES HIT AND ON HOW FAST YOU ANSWER.", "BONUSES ARE GIVEN FOR CORRECTLY PREDICTING ESPECIALLY COMPLEX PATHWAYS."
+  IF QUITTUT <> 0 THEN EXIT SUB
+  Page "EACH GAME HAS 20 BEAMS; EVERY NUMBER IS USED EXACTLY ONCE.", "THE HIGHER YOUR SCORE, THE MORE BAFFLES THE NEXT GAME HAS."
 END SUB
 
-SUB Title
-  CLS
-  COLOR 14
-  LOCATE 3, 20: PRINT "G24  LASER MAZE  (LEI SHE MI GONG)"
-  COLOR 7
-  LOCATE 6, 6: PRINT "Original 1991 educational content:"
-  COLOR 15
-  LOCATE 7, 6: PRINT "A LASER GUN and MIRROR REFLECTION. Light bounces off a mirror so that the"
-  LOCATE 8, 6: PRINT "angle of incidence equals the angle of reflection (the law of reflection)."
-  COLOR 7
-  LOCATE 11, 6: PRINT "How to play:"
-  LOCATE 12, 6: PRINT "A laser gun (blue) shoots along its arrow. Grey blocks stop the beam."
-  LOCATE 13, 6: PRINT "Put limited mirrors on the grid so the beam reaches the gold target."
-  LOCATE 14, 6: PRINT "A / mirror turns right->up, up->right, left->down, down->left."
-  LOCATE 15, 6: PRINT "A \ mirror turns right->down, down->right, left->up, up->left."
-  LOCATE 16, 6: PRINT "Arrow keys move the cursor; / or \ places a mirror; X removes it."
-  LOCATE 17, 6: PRINT "The red line is drawn live. ENTER fires for real. R clears. ESC = menu."
-  COLOR 10
-  LOCATE 19, 6: PRINT "Five levels. Level score = 100, minus 10 per extra shot, plus 10 per mirror"
-  LOCATE 20, 6: PRINT "you did not need."
-  COLOR 14
-  LOCATE 23, 6: PRINT "Press any key to start..."
-  k$ = GetKey$
-  IF k$ = CHR$(27) THEN quit% = 1
-END SUB
+FUNCTION WaitChoice
+  MHide
+  FOR i = 1 TO NBTN
+    DrawBtn i, 0
+  NEXT
+  FlushIn
+  hv = 0
+  DO
+    PollMouse
+    MShow
+    IF CLK <> 0 THEN
+      CLK = 0
+      s = SideHit(CLKX, CLKY)
+      IF s = 2 THEN
+        WaitChoice = -1
+        EXIT FUNCTION
+      END IF
+      IF s = 0 THEN
+        FOR i = 1 TO NBTN
+          IF CLKX >= BTX(i) AND CLKX < BTX(i) + BTW(i) AND CLKY >= BTY(i) AND CLKY < BTY(i) + BTH(i) THEN
+            WaitChoice = i
+            EXIT FUNCTION
+          END IF
+        NEXT
+      END IF
+    END IF
+    k$ = GetKey$
+    IF k$ <> "" THEN
+      kc = ASC(k$)
+      IF kc = 27 THEN
+        WaitChoice = -1
+        EXIT FUNCTION
+      END IF
+      u = ASC(UCASE$(k$))
+      FOR i = 1 TO NBTN
+        IF BK1(i) = u OR BK2(i) = u THEN
+          WaitChoice = i
+          EXIT FUNCTION
+        END IF
+      NEXT
+    END IF
+    'button hover
+    h = 0
+    FOR i = 1 TO NBTN
+      IF MX >= BTX(i) AND MX < BTX(i) + BTW(i) AND MY >= BTY(i) AND MY < BTY(i) + BTH(i) THEN h = i
+    NEXT
+    IF h <> hv THEN
+      MHide
+      IF hv > 0 THEN DrawBtn hv, 0
+      IF h > 0 THEN DrawBtn h, 1
+      hv = h
+    END IF
+  LOOP
+END FUNCTION
