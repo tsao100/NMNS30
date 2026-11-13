@@ -45,6 +45,7 @@
     </label>
     <div class="acts">
       <button class="btn" type="submit" id="send">送出</button>
+      <button class="btn" type="button" id="mail" hidden>用 Email 寄送</button>
       <button class="btn alt" type="button" id="copy">複製內容</button>
       <button class="btn alt" type="button" id="dl">下載為文字檔</button>
     </div>
@@ -76,13 +77,16 @@
   function ok() { if (!$("body").value.trim()) { say("請先寫下你記得的內容。", 1); $("body").focus(); return false; } return true; }
   $("copy").onclick = function () { if (!ok()) return; var t = text(); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { say("已複製，可貼到任何地方傳給我們。"); }, function () { $("preview").style.display = "block"; $("preview").textContent = t; say("無法自動複製，請手動選取下方內容。"); }); };
   $("dl").onclick = function () { if (!ok()) return; var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text()], { type: "text/plain;charset=utf-8" })); a.download = "nmns30-feedback.txt"; a.click(); say("已下載文字檔。"); };
+  if (C.FEEDBACK_REPO && C.FEEDBACK_EMAIL) { $("mail").hidden = false; $("send").textContent = "送出到 GitHub"; }
+  function mailIt() { location.href = "mailto:" + C.FEEDBACK_EMAIL + "?subject=" + encodeURIComponent(title()) + "&body=" + encodeURIComponent(text()); say("已開啟你的郵件程式，請按寄出。"); }
+  $("mail").onclick = function () { if (ok()) mailIt(); };
   $("f").addEventListener("submit", function (e) {
     e.preventDefault(); if (!ok()) return; var t = text();
     if (C.FEEDBACK_REPO) { window.open("https://github.com/" + C.FEEDBACK_REPO + "/issues/new?title=" + encodeURIComponent(title()) + "&body=" + encodeURIComponent(t), "_blank", "noopener"); say("已開啟 GitHub 預填頁，請在該頁按「Submit new issue」完成送出。"); }
-    else if (C.FEEDBACK_EMAIL) { location.href = "mailto:" + C.FEEDBACK_EMAIL + "?subject=" + encodeURIComponent(title()) + "&body=" + encodeURIComponent(t); say("已開啟你的郵件程式，請按寄出。"); }
+    else if (C.FEEDBACK_EMAIL) mailIt();
     else { $("copy").click(); say("本站尚未設定收件處；內容已複製，請改用「複製內容」或「下載」後傳給站長。"); }
   });
-  $("how").textContent = C.FEEDBACK_REPO ? "送出方式：會在 GitHub 專案開一則公開的 Issue（需 GitHub 帳號）。" : C.FEEDBACK_EMAIL ? "送出方式：會用你的郵件程式寄給站長。" : "目前站長尚未設定收件處，請用「複製內容」或「下載」保存留言。";
+  $("how").textContent = C.FEEDBACK_REPO ? "送出方式：「送出到 GitHub」會開一則公開的 Issue（需 GitHub 帳號）" + (C.FEEDBACK_EMAIL ? "；沒有帳號可按「用 Email 寄送」，用你的郵件程式寄給站長。" : "。") : C.FEEDBACK_EMAIL ? "送出方式：會用你的郵件程式寄給站長。" : "目前站長尚未設定收件處，請用「複製內容」或「下載」保存留言。";
 })();
 </script>
 </body>

@@ -7,6 +7,6 @@ const { chromium } = require('playwright'); const path = require('path');
   if (!/複製|尚未設定|GitHub/.test(await p.innerText('#status'))) errs.push('status: ' + await p.innerText('#status'));
   await p.evaluate(() => { window.NMNS_CONFIG.FEEDBACK_REPO = 'a/b'; window.open = (u) => { window.__u = u; }; });
   await p.click('#send'); const u = await p.evaluate(() => window.__u); if (!/github\.com\/a\/b\/issues\/new\?title=/.test(u)) errs.push('issue url ' + u);
-  await p.fill('#body', ''); await p.click('#send'); if (!/請先/.test(await p.innerText('#status'))) errs.push('empty check');
+  if (await p.isHidden('#mail')) errs.push('mail btn hidden'); await p.evaluate(() => { window.__m = 0; }); await p.fill('#body', ''); await p.click('#send'); if (!/請先/.test(await p.innerText('#status'))) errs.push('empty check');
   await p.goto('file://' + path.resolve(__dirname, '..', 'play.html') + '?g=5'); if (!(await p.getAttribute('#fb', 'href')).endsWith('g=5')) errs.push('play link');
   console.log(errs.length ? errs : 'FEEDBACK OK'); await b.close(); process.exit(errs.length ? 1 : 0); })();
