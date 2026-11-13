@@ -1,17 +1,54 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NMNS30 電腦益智遊戲</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NMNS30 電腦益智遊戲</title>
+<meta name="description" content="國立自然科學博物館電腦益智室 30 個遊戲單元（1991 年名單）的瀏覽器版本，點選即玩。">
+<link rel="stylesheet" href="shared/style.css">
 </head>
 <body>
-    <h1>國立自然科學博物館電腦益智遊戲</h1>
-    <h2>NMNS30</h2>
-    <p>歡迎來到 30 款經典電腦益智遊戲復刻計畫。</p>
-
-    <button onclick="alert('NMNS30 網站測試成功！')">
-        測試遊戲
-    </button>
+<header class="top"><div class="in">
+  <h1>NMNS30｜電腦益智遊戲 30 款</h1>
+  <span class="sub">國立自然科學博物館電腦益智室（1991）名單復刻．瀏覽器直接遊玩</span>
+</div></header>
+<main>
+  <p>共 30 款：數學 18、物理 7、生物 2、健康教育 2、美術 1。點選「開始遊戲」就能在瀏覽器遊玩，手機與電腦都可以；每款也附上 QBasic 復古版原始碼。</p>
+  <div id="list"></div>
+</main>
+<footer>
+  <p>名單來源：陳惠美，〈國立自然科學博物館電腦益智室簡介〉，《科學教育月刊》第 138 期，1991 年 3 月，第 71 頁。
+  原文只記載遊戲名稱與教育內容，各遊戲的規則與畫面為依教育內容重新設計，並非原版程式的還原。</p>
+</footer>
+<script src="data/games.js"></script>
+<script>
+(function () {
+  var list = document.getElementById("list");
+  Object.keys(NMNS_CATS).forEach(function (k) {
+    var cat = NMNS_CATS[k], games = NMNS_GAMES.filter(function (g) { return g.cat === k; });
+    var h2 = document.createElement("h2");
+    h2.textContent = cat.name + "（" + games.length + " 個）";
+    h2.style.setProperty("--c", cat.color);
+    var grid = document.createElement("div");
+    grid.className = "grid";
+    games.forEach(function (g) {
+      var no = (g.n < 10 ? "0" : "") + g.n;
+      var card = document.createElement("div");
+      card.className = "card";
+      card.style.setProperty("--c", cat.color);
+      card.innerHTML =
+        '<span class="no">' + no + '</span><span class="nm"></span><span class="en"></span><span class="ed"></span>' +
+        '<span class="acts"><a class="btn" href="play.html?g=' + g.n + '">開始遊戲</a>' +
+        '<a class="link" href="qbasic/G' + no + '.BAS">QBasic 原始碼</a></span>';
+      card.querySelector(".nm").textContent = g.name;
+      card.querySelector(".en").textContent = g.en;
+      card.querySelector(".ed").textContent = g.edu;
+      grid.appendChild(card);
+    });
+    list.appendChild(h2);
+    list.appendChild(grid);
+  });
+})();
+</script>
 </body>
 </html>
