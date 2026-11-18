@@ -18,7 +18,7 @@ tests/            Playwright 煙霧測試（node tests/smoke.js [遊戲編號…
 ```
 
 ## 發布到 GitHub Pages
-Settings → Pages → Branch: main / root。網址是 `https://<帳號>.github.io/<倉庫名>/`。
+Settings → Pages → Branch: main / root。網址是 https://tsao100.github.io/NMNS30/
 
 ## 新增或修改遊戲
 每個遊戲是 `NMNS.register(編號, function (root) { … })`，把畫面建在 `root` 裡即可；共用工具見 `shared/engine.js`（`h()` 建 DOM、`btn()`、`tabs()`、`makeCanvas()`、`arith()` 等）。
