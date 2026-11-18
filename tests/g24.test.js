@@ -26,4 +26,12 @@ module.exports = async (p, errs) => {
   const a = await p.evaluate(() => { const S = window.__laser.S(); return { end: S.endview, miss: S.miss, score: S.score, shot: S.shotno, fin: window.__fin, beams: S.beams.length }; });
   if (a.end !== 1 || a.miss !== 0 || a.shot !== 20 || a.beams !== 20 || a.score <= 7000 || a.fin !== 0) errs.push('G24 auto ' + JSON.stringify(a));
   await p.screenshot({ path: '/tmp/claude-0/-home-claude/3f117e0c-b975-555a-a27f-1ab99ea5a9ef/scratchpad/g24_end.png' });
+  // 第二種：在「開始」畫面先按 A，再按開始，整局自動
+  await p.reload(); await p.waitForTimeout(400);
+  await p.evaluate(() => { window.__fin = 0; NMNS.finish = () => { window.__fin++; }; });
+  const b3 = await p.locator('#stage canvas').boundingBox(); const k3 = (x, y) => p.mouse.click(b3.x + x * b3.width / 640, b3.y + y * b3.height / 480);
+  await k3(320, 232); await p.waitForTimeout(200); await p.keyboard.press('A'); await p.waitForTimeout(100); await k3(320, 312);
+  await p.waitForFunction(() => window.__laser.S().endview === 1, null, { timeout: 90000 }).catch(() => {});
+  const c = await p.evaluate(() => { const S = window.__laser.S(); return { end: S.endview, miss: S.miss, shot: S.shotno, fin: window.__fin }; });
+  if (c.end !== 1 || c.miss !== 0 || c.shot !== 20 || c.fin !== 0) errs.push('G24 prearm auto ' + JSON.stringify(c));
 };

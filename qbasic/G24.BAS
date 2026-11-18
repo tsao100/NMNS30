@@ -95,6 +95,7 @@ DIM SHARED BTT$(1 TO 5), BK1(1 TO 5), BK2(1 TO 5), NBTN
 DIM SHARED MC(0 TO 29), BOMB(1 TO 100)
 DIM SHARED HAVEMOUSE, MSHOWN, SOUNDON, SHOWMENU, ENDVIEW, SCRN, HOVP
 DIM SHARED MX, MY, PB, CLK, CLKX, CLKY
+DIM SHARED AUTOP
 DIM SHARED BB, EXITP, MISS, REFL, HIT, SHOTNO, GAMEOK, QUITTUT
 DIM SHARED LVL$, SOLDV, SOLDX, SOLDY, ALV, ALX, ALY
 
@@ -439,6 +440,7 @@ SUB DrawTitle
 END SUB
 
 SUB Dly (s!)
+  IF AUTOP <> 0 THEN s! = s! / 20
   t0! = TIMER
   DO
     t! = TIMER - t0!
@@ -622,6 +624,7 @@ END SUB
 
 SUB PlayGame
   GAMEOK = 1
+  AUTOP = 0
   LevelPage
   IF GAMEOK = 0 THEN EXIT SUB
   SCORE = 7000: MISS = 0: SHOTNO = 0
@@ -726,6 +729,7 @@ SUB PlayGame
   IF SCORE > HI THEN HI = SCORE
   ENDVIEW = 1                    'untouched baffles turn yellow
   DrawGame
+  AUTOP = 0
   Msg 2, "GAME COMPLETE...YOUR SCORE WAS " + NumL$(SCORE) + "  (UNTOUCHED BAFFLES: YELLOW)", 15
   Msg 3, "THE HIGHEST SCORE IS " + NumL$(HI), 10
   ClearBtns
@@ -773,12 +777,18 @@ SUB PutStat (r, l$, v$, c)
 END SUB
 
 FUNCTION ReadGuess (p, tk)
+  IF AUTOP <> 0 THEN
+    Msg 1, "AUTO SOLVE: LAZER " + Num$(p) + " -> " + Num$(EXITP), 14
+    tk = 11
+    ReadGuess = EXITP
+    EXIT FUNCTION
+  END IF
   SoldOn SXP(p), SYP(p)
   FlushIn
   ClearBtns
   pr$ = "WHAT IS THE OUTPUT OF LAZER NO. " + Num$(p) + " ? "
   Msg 1, pr$, 15
-  Msg 2, "CLICK THE PORT WHERE THE BEAM COMES OUT  (OR TYPE ITS 2 DIGITS)", 7
+  Msg 2, "CLICK THE EXIT PORT OR TYPE 2 DIGITS  (PRESS A = AUTO-SOLVE ALL)", 7
   HOVP = 0
   d$ = "": res = 0: done = 0
   t0! = TIMER: lb! = TIMER
@@ -801,6 +811,8 @@ FUNCTION ReadGuess (p, tk)
         kc = ASC(k$)
         IF kc = 27 THEN
           res = -1: done = 1
+        ELSEIF kc = 65 OR kc = 97 THEN
+          AUTOP = 1: res = EXITP: done = 1
         ELSEIF kc = 8 THEN
           d$ = ""
           Msg 1, pr$, 15
@@ -846,6 +858,7 @@ FUNCTION ReadGuess (p, tk)
   IF el! < 0 THEN el! = el! + 86400!
   IF el! > 3000 THEN el! = 3000
   tk = INT(el! * 10) + 1
+  IF AUTOP <> 0 THEN tk = 11
   ReadGuess = res
 END FUNCTION
 
@@ -898,7 +911,7 @@ SUB SoldOn (x, y)
 END SUB
 
 SUB Snd (f, t)
-  IF SOUNDON = 0 THEN EXIT SUB
+  IF SOUNDON = 0 OR AUTOP <> 0 THEN EXIT SUB
   ff = f
   IF ff < 37 THEN ff = 37
   IF ff > 32767 THEN ff = 32767

@@ -54,7 +54,7 @@
     <div id="preview"></div>
   </form>
   <p class="link" id="how"></p>
-  <p><a class="btn alt" href="index.html">← 回遊戲選單</a></p>
+  <p><a class="btn alt" href="feedbacks.html">💬 瀏覽所有反饋</a> <a class="btn alt" href="index.html">← 回遊戲選單</a></p>
 </main>
 <script src="data/games.js"></script>
 <script src="data/config.js"></script>
@@ -100,7 +100,7 @@
     else if (C.FEEDBACK_EMAIL) mailIt();
     else { $("copy").click(); say("本站尚未設定收件處；內容已複製，請改用「複製內容」或「下載」後傳給站長。"); }
   });
-  $("how").textContent = DB ? "送出方式：留言會存進站長的資料庫（不公開）；聯絡方式只有站長看得到。" : C.FEEDBACK_REPO ? "送出方式：「送出到 GitHub」會開一則公開的 Issue（需 GitHub 帳號）" + (C.FEEDBACK_EMAIL ? "；沒有帳號可按「用 Email 寄送」，用你的郵件程式寄給站長。" : "。") : C.FEEDBACK_EMAIL ? "送出方式：會用你的郵件程式寄給站長。" : "目前站長尚未設定收件處，請用「複製內容」或「下載」保存留言。";
+  $("how").textContent = DB ? "送出方式：留言內容會存進資料庫並公開顯示在「瀏覽所有反饋」；聯絡方式不會公開，只有站長看得到。請勿在留言內容裡寫私人資料。" : C.FEEDBACK_REPO ? "送出方式：「送出到 GitHub」會開一則公開的 Issue（需 GitHub 帳號）" + (C.FEEDBACK_EMAIL ? "；沒有帳號可按「用 Email 寄送」，用你的郵件程式寄給站長。" : "。") : C.FEEDBACK_EMAIL ? "送出方式：會用你的郵件程式寄給站長。" : "目前站長尚未設定收件處，請用「複製內容」或「下載」保存留言。";
 })();
 </script>
 </body>

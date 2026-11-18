@@ -16,6 +16,10 @@
   api.topScores = function (game, variant, higher) {
     return req("GET", "scores?select=name,score,created_at&game=eq." + game + "&variant=eq." + encodeURIComponent(variant || "") + "&order=score." + (higher ? "desc" : "asc") + ",created_at.asc&limit=10");
   };
+  api.listFeedback = function (o) {
+    var q = "feedback?select=id,game,kind,body,happened,created_at&order=created_at.desc,id.desc&limit=" + (o.limit + 1) + "&offset=" + (o.offset || 0);
+    if (o.game !== "" && o.game != null) q += "&game=eq." + encodeURIComponent(o.game); if (o.kind) q += "&kind=eq." + encodeURIComponent(o.kind); return req("GET", q);
+  };
   api.submitFeedback = function (o) { return req("POST", "feedback", o); };
 
   function table(rows, unit, me) {

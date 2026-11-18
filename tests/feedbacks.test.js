@@ -1,0 +1,17 @@
+const { chromium } = require('playwright'); const path = require('path');
+(async () => { const b = await chromium.launch(), errs = [], urls = [];
+  const rows = Array.from({ length: 25 }, (_, i) => ({ id: i, game: i % 2 ? 7 : 0, kind: '規則／玩法', body: '<b>留言' + i + '</b>', happened: i === 0 ? '1990 年臺中' : '', created_at: '2026-11-1' + (i % 9) + 'T00:00:00Z' }));
+  const ctx = await b.newContext(); await ctx.route('https://x.supabase.co/**', r => { const u = new URL(r.request().url()); urls.push(u.search);
+    const lim = +u.searchParams.get('limit'), off = +u.searchParams.get('offset'); let rs = rows; const g = u.searchParams.get('game'); if (g) rs = rs.filter(x => x.game === +g.slice(3));
+    r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(rs.slice(off, off + lim)) }); });
+  const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.route('**/data/config.js*', r => r.fulfill({ contentType: 'text/javascript', body: 'window.NMNS_CONFIG={SUPABASE_URL:"https://x.supabase.co",SUPABASE_ANON_KEY:"sb_publishable_K"};' }));
+  await p.goto('file://' + path.resolve(__dirname, '..', 'feedbacks.html')); await p.waitForTimeout(500);
+  if (await p.locator('.fb').count() !== 20) errs.push('first page count ' + await p.locator('.fb').count());
+  if (await p.isHidden('#more')) errs.push('more hidden'); if (/contact/.test(urls[0])) errs.push('contact requested');
+  if (!(await p.innerText('.fb .body')).includes('<b>留言0</b>')) errs.push('html not escaped');
+  await p.click('#more'); await p.waitForTimeout(400); if (await p.locator('.fb').count() !== 25) errs.push('after more ' + await p.locator('.fb').count());
+  if (!(await p.isHidden('#more'))) errs.push('more still shown');
+  await p.selectOption('#fg', '7'); await p.waitForTimeout(400); if (!urls.some(u => /game=eq\.7/.test(u))) errs.push('filter not sent');
+  if (await p.locator('.fb').count() !== 12) errs.push('filtered count ' + await p.locator('.fb').count());
+  console.log(errs.length ? errs : 'FEEDBACKS OK'); await b.close(); process.exit(errs.length ? 1 : 0); })();

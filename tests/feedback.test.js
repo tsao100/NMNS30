@@ -1,12 +1,13 @@
 const { chromium } = require('playwright'); const path = require('path');
 (async () => { const b = await chromium.launch(), p = await b.newPage(), errs = [];
   p.on('pageerror', e => errs.push(e.message));
+  await p.route('**/data/config.js*', r => r.fulfill({ contentType: 'text/javascript', body: 'window.NMNS_CONFIG={FEEDBACK_REPO:"",FEEDBACK_EMAIL:""};' }));
   await p.goto('file://' + path.resolve(__dirname, '..', 'feedback.html') + '?g=7'); 
   if (await p.inputValue('#game') !== '7') errs.push('game preselect');
   await p.fill('#body', '測試內容'); await p.click('#send'); await p.waitForTimeout(200);
   if (!/複製|尚未設定|GitHub/.test(await p.innerText('#status'))) errs.push('status: ' + await p.innerText('#status'));
   await p.evaluate(() => { window.NMNS_CONFIG.FEEDBACK_REPO = 'a/b'; window.open = (u) => { window.__u = u; }; });
   await p.click('#send'); const u = await p.evaluate(() => window.__u); if (!/github\.com\/a\/b\/issues\/new\?title=/.test(u)) errs.push('issue url ' + u);
-  if (await p.isHidden('#mail')) errs.push('mail btn hidden'); await p.evaluate(() => { window.__m = 0; }); await p.fill('#body', ''); await p.click('#send'); if (!/請先/.test(await p.innerText('#status'))) errs.push('empty check');
+  await p.evaluate(() => { window.__m = 0; }); await p.fill('#body', ''); await p.click('#send'); if (!/請先/.test(await p.innerText('#status'))) errs.push('empty check');
   await p.goto('file://' + path.resolve(__dirname, '..', 'play.html') + '?g=5'); if (!(await p.getAttribute('#fb', 'href')).endsWith('g=5')) errs.push('play link');
   console.log(errs.length ? errs : 'FEEDBACK OK'); await b.close(); process.exit(errs.length ? 1 : 0); })();

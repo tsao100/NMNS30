@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>瀏覽到訪者反饋｜NMNS30</title>
+<link rel="stylesheet" href="shared/style.css?v=20261118">
+<style>
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  .filters select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+  .fb { background: var(--panel); border: 1px solid var(--line); border-left: 6px solid var(--accent); border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+  .fb .meta { color: var(--muted); font-size: .85rem; display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 4px; }
+  .fb .body { white-space: pre-wrap; overflow-wrap: anywhere; }
+  #state { color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <h1><a href="index.html">NMNS30</a>｜所有到訪者反饋</h1>
+  <span class="sub">大家記得的當年遊戲畫面、規則與資料</span>
+</div></header>
+<main>
+  <p>這裡列出到訪者留下的資料（聯絡方式不公開）。你也記得什麼？歡迎<a href="feedback.html">我要留言</a>。</p>
+  <div class="filters">
+    <label>遊戲 <select id="fg"></select></label>
+    <label>類型 <select id="fk"><option value="">全部</option></select></label>
+    <button class="btn alt sm" type="button" id="rf">重新整理</button>
+  </div>
+  <div id="state" role="status"></div>
+  <div id="list"></div>
+  <p><button class="btn" type="button" id="more" hidden>載入更多</button></p>
+  <p class="link" id="alt"></p>
+  <p><a class="btn alt" href="index.html">← 回遊戲選單</a> <a class="btn alt" href="feedback.html">📝 我要留言</a></p>
+</main>
+<script src="data/games.js?v=20261118"></script>
+<script src="data/config.js?v=20261118"></script>
+<script src="shared/engine.js?v=20261118"></script>
+<script src="shared/scores.js?v=20261118"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); }, C = window.NMNS_CONFIG || {}, PAGE = 20, offset = 0, token = 0;
+  var KINDS = ["規則／玩法", "畫面／角色／配色", "關卡／難度／題目", "音效／音樂", "操作方式（鍵盤、搖桿等）", "電腦機種與環境", "舊資料／文獻／照片線索", "錯誤回報", "其他"];
+  var gm = { 0: "整體／不指定" }; NMNS_GAMES.forEach(function (g) { gm[g.n] = (g.n < 10 ? "0" : "") + g.n + " " + g.name; });
+  var fg = $("fg"), fk = $("fk");
+  var o = document.createElement("option"); o.value = ""; o.textContent = "全部"; fg.appendChild(o);
+  Object.keys(gm).forEach(function (k) { var e = document.createElement("option"); e.value = k; e.textContent = gm[k]; fg.appendChild(e); });
+  KINDS.forEach(function (k) { var e = document.createElement("option"); e.value = k; e.textContent = k; fk.appendChild(e); });
+  var q = parseInt(new URLSearchParams(location.search).get("g"), 10); if (q >= 0 && q <= 30) fg.value = String(q);
+  if (C.FEEDBACK_REPO) $("alt").innerHTML = ""; if (C.FEEDBACK_REPO) { var a = document.createElement("a"); a.href = "https://github.com/" + C.FEEDBACK_REPO + "/issues"; a.textContent = "也可以到 GitHub Issues 看公開留言"; a.target = "_blank"; a.rel = "noopener"; $("alt").appendChild(a); }
+  function card(r) {
+    var d = new Date(r.created_at), ds = isNaN(d) ? "" : d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+    var meta = h("div", { class: "meta" }, h("b", {}, gm[r.game] || "遊戲 " + r.game), h("span", {}, r.kind || "其他"), h("span", {}, ds));
+    if (r.happened) meta.append(h("span", {}, "時間地點：" + r.happened));
+    return h("div", { class: "fb" }, meta, h("div", { class: "body" }, r.body));
+  }
+  function load(reset) {
+    if (!NMNS.api.enabled) { $("state").textContent = "站長尚未啟用資料庫，無法瀏覽留言。"; return; }
+    var my = ++token; if (reset) { offset = 0; $("list").innerHTML = ""; $("more").hidden = true; }
+    $("state").textContent = "讀取中…";
+    NMNS.api.listFeedback({ game: fg.value, kind: fk.value, offset: offset, limit: PAGE }).then(function (rows) {
+      if (my !== token) return; var more = rows.length > PAGE; rows.slice(0, PAGE).forEach(function (r) { $("list").append(card(r)); });
+      offset += Math.min(rows.length, PAGE); $("more").hidden = !more;
+      $("state").textContent = offset === 0 ? "還沒有符合條件的留言。" : "已顯示 " + offset + " 則" + (more ? "，還有更多" : "。");
+    }, function () { if (my === token) $("state").textContent = "讀取失敗，請稍後再試。（若是剛設定好，請確認已重新執行 supabase/schema.sql）"; });
+  }
+  fg.onchange = fk.onchange = $("rf").onclick = function () { load(true); }; $("more").onclick = function () { load(false); };
+  load(true);
+})();
+</script>
+</body>
+</html>

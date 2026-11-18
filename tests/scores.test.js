@@ -10,7 +10,7 @@ const { chromium } = require('playwright'); const path = require('path');
     r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(rows) }); });
   const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
   const inject = () => p.addInitScript(() => { window.__cfg = 1; });
-  await p.route('**/data/config.js', r => r.fulfill({ contentType: 'text/javascript', body: 'window.NMNS_CONFIG={SUPABASE_URL:"https://x.supabase.co",SUPABASE_ANON_KEY:"sb_publishable_KEY",FEEDBACK_REPO:"a/b",FEEDBACK_EMAIL:"e@x.y"};' }));
+  await p.route('**/data/config.js*', r => r.fulfill({ contentType: 'text/javascript', body: 'window.NMNS_CONFIG={SUPABASE_URL:"https://x.supabase.co",SUPABASE_ANON_KEY:"sb_publishable_KEY",FEEDBACK_REPO:"a/b",FEEDBACK_EMAIL:"e@x.y"};' }));
   const base = 'file://' + path.resolve(__dirname, '..') + '/';
   // G04：完成 1 片漢諾塔後登錄（步數越少越好）
   await p.goto(base + 'play.html?g=4'); await p.waitForTimeout(400);

@@ -82,7 +82,7 @@ NMNS.register(24, function (root) {
       ln(192, 158, 208, 142, 15); ln(192, 133, 208, 117, 15); ln(432, 117, 448, 133, 15); ln(432, 142, 448, 158, 15);
       soldier(90, 146); alien(550, 146); ctext(12, "你想做什麼？", 15); ctext(24, "滑鼠：點按鈕、點出口號碼作答　鍵盤：輸入兩位數字", 7); ctext(25, "F2＝音效開關　ESC＝離開　A＝自動解答", 8);
     } else if (S.scrn === 2) {
-      ctext(8, "雷 射 迷 宮   LAZER MAZE", 14); ctext(12, "你目前的等級：" + S.lvl, 15); ctext(14, "盒內有 " + S.refl + " 面反射鏡", 15); ctext(17, "每局有 " + NSHOT + " 道光束", 7);
+      ctext(8, "雷 射 迷 宮   LAZER MAZE", 14); ctext(12, "你目前的等級：" + S.lvl, 15); ctext(14, "盒內有 " + S.refl + " 面反射鏡", 15); ctext(17, "每局有 " + NSHOT + " 道光束", 7); ctext(21, S.auto ? "已啟用自動解答：按「開始」後自動答完整局" : "想快速得分？按 A 或點右側「自動解答」，自動答完整局", S.auto ? 14 : 8);
     } else {
       txt(1, 1, "雷射迷宮", 14);
       box(GX0 - 1, GY0 - 1, GX0 + 320, GY0 + 320, 15);
@@ -103,11 +103,12 @@ NMNS.register(24, function (root) {
 
   // ---------- 輸入與聲音 ----------
   function pt(e) { var r = cv.c.getBoundingClientRect(); return [(e.clientX - r.left) * 640 / r.width, (e.clientY - r.top) * 480 / r.height]; }
-  cv.c.addEventListener("pointerdown", function (e) { var p = pt(e); CLK = 1; CLKX = p[0]; CLKY = p[1]; MX = p[0]; MY = p[1]; });
+  cv.c.addEventListener("pointerdown", function (e) { var p = pt(e); if (S.showauto && p[0] >= 556 && p[0] < 636 && p[1] >= 128 && p[1] < 152) { S.auto = 1; S.autoUsed = 1; render(); } CLK = 1; CLKX = p[0]; CLKY = p[1]; MX = p[0]; MY = p[1]; });
   cv.c.addEventListener("pointermove", function (e) { var p = pt(e); MX = p[0]; MY = p[1]; });
   window.addEventListener("keydown", function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     var k = e.key; if (k === "Enter") k = "\r"; else if (k === "Escape") k = "\x1b"; else if (k === "Backspace") k = "\b"; else if (k === "F2") { e.preventDefault(); S.soundon = 1 - S.soundon; render(); return; } else if (k.length !== 1) return;
+    if ((k === "a" || k === "A") && S.showauto) { S.auto = 1; S.autoUsed = 1; render(); }
     keys.push(k); if (k === "\b" || k === " ") e.preventDefault();
   });
   function getKey() { return keys.length ? keys.shift() : ""; }
@@ -211,6 +212,7 @@ NMNS.register(24, function (root) {
     function goAuto() { S.auto = 1; S.autoUsed = 1; res = S.exitp; done = 1; }
     if (S.auto) { goAuto(); msg(1, "自動解答中…雷射 " + p + " 號 → " + res + " 號", 14); S.soldv = 1; S.tk = 11; await zz(30); return res; }
     while (!done) {
+      if (S.auto) { goAuto(); break; }
       if (CLK) { CLK = 0; var sh = sideHit(CLKX, CLKY); if (sh === 2) { res = -1; done = 1; } else if (sh === 3) goAuto(); else if (sh === 0) { var q = portAt(CLKX, CLKY); if (q > 0) { res = q; done = 1; } } }
       if (!done) {
         var k = getKey();
@@ -238,7 +240,7 @@ NMNS.register(24, function (root) {
   function resetBoardView() { S.beams = []; S.live = []; S.fx = []; S.soldv = 0; S.alv = 0; S.endview = 0; for (var p = 10; p < 50; p++) { S.used[p] = 0; S.ucol[p] = 0; } S.scrn = 3; S.showmenu = 1; S.showauto = 1; clearBtns(); render(); }
 
   async function levelPage() {
-    S.scrn = 2; S.showmenu = 1; statusReset(); clearBtns(); addBtn(270, 296, 100, 32, "開始", 13); var r = await waitChoice(); clearBtns(); if (r < 0) S.gameok = 0;
+    S.scrn = 2; S.showmenu = 1; S.showauto = 1; statusReset(); clearBtns(); addBtn(270, 296, 100, 32, "開始", 13); var r = await waitChoice(); clearBtns(); if (r < 0) S.gameok = 0;
   }
   async function playGame() {
     S.gameok = 1; S.auto = 0; S.autoUsed = 0; S.showauto = 0; await levelPage(); if (!S.gameok) return;
