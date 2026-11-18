@@ -8,7 +8,7 @@ const path = require('path');
     for (const vp of [{width:1000,height:800},{width:375,height:700}]) {
       const p = await b.newPage({viewport: vp}); const errs = [];
       p.on('pageerror', e => errs.push('pageerror: ' + e.message));
-      p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+      p.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|supabase/.test(m.text() + m.location().url)) errs.push('console: ' + m.text()); });
       await p.goto('file://' + path.resolve(__dirname, '..', 'play.html') + '?g=' + n);
       await p.waitForTimeout(400);
       const txt = await p.locator('#stage').innerText();

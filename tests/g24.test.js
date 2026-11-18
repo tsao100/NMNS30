@@ -15,4 +15,15 @@ module.exports = async (p, errs) => {
   await click(320, 232); await p.waitForTimeout(150); await click(320, 312); await p.waitForTimeout(200);
   await p.keyboard.type('11'); await p.waitForFunction(() => window.__laser.S().beams.length >= 1, null, { timeout: 15000 }).catch(() => {});
   const s = await p.evaluate(() => window.__laser.S()); if (s.shotno < 1 || s.beams.length < 1) errs.push('G24 shot not completed: shotno=' + s.shotno + ' beams=' + s.beams.length);
+  // 自動解答：重新載入 → 開始 → 按 A → 20 發全對，且不登錄高分榜
+  await p.reload(); await p.waitForTimeout(400);
+  await p.evaluate(() => { window.__fin = 0; NMNS.finish = () => { window.__fin++; }; });
+  const bx = await p.locator('#stage canvas').boundingBox();
+  const clk = (x, y) => p.mouse.click(bx.x + x * bx.width / 640, bx.y + y * bx.height / 480);
+  await clk(320, 232); await p.waitForTimeout(150); await clk(320, 312); await p.waitForTimeout(300);
+  await p.keyboard.press('a');
+  await p.waitForFunction(() => window.__laser.S().endview === 1, null, { timeout: 90000 }).catch(() => {});
+  const a = await p.evaluate(() => { const S = window.__laser.S(); return { end: S.endview, miss: S.miss, score: S.score, shot: S.shotno, fin: window.__fin, beams: S.beams.length }; });
+  if (a.end !== 1 || a.miss !== 0 || a.shot !== 20 || a.beams !== 20 || a.score <= 7000 || a.fin !== 0) errs.push('G24 auto ' + JSON.stringify(a));
+  await p.screenshot({ path: '/tmp/claude-0/-home-claude/3f117e0c-b975-555a-a27f-1ab99ea5a9ef/scratchpad/g24_end.png' });
 };
