@@ -29,7 +29,7 @@ NMNS.register(3, function (root) {
   }
   function show() {
     box.innerHTML = ""; pic.textContent = ""; tried = false;
-    if (idx >= probs.length) { m.say("全部完成！答對 " + score + " / " + probs.length + " 題。按「重新開始」再玩。", "ok"); return; }
+    if (idx >= probs.length) { NMNS.finish(3, score); m.say("全部完成！答對 " + score + " / " + probs.length + " 題。按「重新開始」再玩。", "ok"); return; }
     var p = probs[idx], ins = [];
     var form = h("div", { class: "row" });
     p.f.forEach(function (lab) { var i = h("input", { type: "number", "aria-label": lab }); ins.push(i); form.append(lab + "：", i); });

@@ -53,7 +53,7 @@ NMNS.register(9, function (root) {
     total += strokes; totalPar += par; scores.push(strokes);
     m.say((inHole ? "進洞！" : "已達 8 桿上限。") + " " + strokes + " 桿，" + nm + "。累計 " + total + " 桿（標準桿 " + totalPar + "）。", inHole ? "ok" : "bad");
     qBox.innerHTML = "";
-    if (hole >= HOLES.length - 1) { qBox.append(h("p", { class: "big" }, "全部 9 洞完成！總桿數 " + total + "，與標準桿相差 " + (total - totalPar > 0 ? "+" : "") + (total - totalPar) + "。")); return; }
+    if (hole >= HOLES.length - 1) { NMNS.finish(9, total); qBox.append(h("p", { class: "big" }, "全部 9 洞完成！總桿數 " + total + "，與標準桿相差 " + (total - totalPar > 0 ? "+" : "") + (total - totalPar) + "。")); return; }
     qBox.append(btn("下一洞", function () { hole++; if (hole >= 4) level = 2; newHole(); }));
   }
   power.addEventListener("input", upd);

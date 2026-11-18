@@ -254,7 +254,7 @@ NMNS.register(24, function (root) {
     }
     statusReset();
     if (S.miss === 0) { var bn = 20 * S.refl; S.score += bn; msg(1, "NO MISSES !!! BONUS " + bn + " !!! NO MISSES", 14); for (n = 1; n <= 12; n++) await snd(800 + n * 80, 1); }
-    if (S.score > S.hi) S.hi = S.score;
+    if (S.score > S.hi) S.hi = S.score; NMNS.finish(24, S.score);
     S.endview = 1; msg(2, "GAME COMPLETE...YOUR SCORE WAS " + S.score + "  (UNTOUCHED BAFFLES: YELLOW)", 15); msg(3, "THE HIGHEST SCORE IS " + S.hi, 10);
     clearBtns(); addBtn(556, 296, 80, 32, "NEXT GAME", 13); var r2 = await waitChoice(); clearBtns(); if (r2 < 0) S.gameok = 0;
     if (S.score > 3000) { S.refl = 30; S.lvl = "A HIGHER LEVEL GAME"; } if (S.score > 4000) { S.refl = 40; S.lvl = "AN INTERMEDIATE LEVEL GAME"; }

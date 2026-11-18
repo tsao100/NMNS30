@@ -53,7 +53,7 @@ NMNS.register(6, function (root) {
       if (finished) return;
       var nx = p[0] + d[0], ny = p[1] + d[1];
       if (grid[ny] && grid[ny][nx] === 0) { p = [nx, ny]; steps++; draw(); }
-      if (p[0] === goal[0] && p[1] === goal[1]) { finished = true; score += 2; m.say("走出迷宮了！共 " + steps + " 步。總分 " + score + " / " + (TOTAL + 1) + "。按「重新開始」再玩。", "ok"); }
+      if (p[0] === goal[0] && p[1] === goal[1]) { finished = true; score += 2; NMNS.finish(6, score); m.say("走出迷宮了！共 " + steps + " 步。總分 " + score + " / " + (TOTAL + 1) + "。按「重新開始」再玩。", "ok"); }
     }
     var map = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0] };
     mazeKey = function (e) { var d = { ArrowUp: "U", ArrowDown: "D", ArrowLeft: "L", ArrowRight: "R" }[e.key]; if (d) mv(map[d]); };

@@ -45,7 +45,7 @@ NMNS.register(27, function (root) {
   function clueMode() {
     area.innerHTML = ""; var r = 0, score = 0, box = h("div");
     function round() {
-      box.innerHTML = ""; if (r >= 8) { m.say("動物識別：" + score + " / 8。", score >= 7 ? "ok" : "info"); box.append(btn("再玩一次", clueMode)); return; }
+      box.innerHTML = ""; if (r >= 8) { NMNS.finish(27, score); m.say("動物識別：" + score + " / 8。", score >= 7 ? "ok" : "info"); box.append(btn("再玩一次", clueMode)); return; }
       var ai = rnd(A.length), a = A[ai], idx = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 4), opts = [ai];
       var tries = 0; while (opts.length < 4 && tries++ < 500) { var b = rnd(A.length); if (opts.indexOf(b) >= 0) continue; var bc = clues(A[b], idx).join("|"), ac = clues(a, idx).join("|"); if (bc !== ac) opts.push(b); }
       opts = shuffle(opts);

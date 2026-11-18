@@ -88,7 +88,7 @@ NMNS.register(28, function (root) {
     var order = h("div", { class: "msg info" }, "正確刷牙：牙刷與牙齒成 45 度，一次刷 2～3 顆，輕輕畫小圓；外面、內面、咬合面都要刷，最後別忘了舌頭。（點黃褐色的牙菌斑把它刷掉！點到牙齦會刷傷喔！）");
     function spawn() { var k = rnd(2) + "," + rnd(16); plq[k] = 1; }
     function paint() { rects = drawChart(g, 640, 260, null, plq); }
-    function end() { over = true; stop(); m.say("時間到！刷掉 " + score + " 塊牙菌斑，刷傷牙齦 " + hurts + " 次。" + (hurts === 0 ? "很溫柔！" : "刷牙要輕一點。"), score >= 15 ? "ok" : "info"); }
+    function end() { over = true; stop(); NMNS.finish(28, score); m.say("時間到！刷掉 " + score + " 塊牙菌斑，刷傷牙齦 " + hurts + " 次。" + (hurts === 0 ? "很溫柔！" : "刷牙要輕一點。"), score >= 15 ? "ok" : "info"); }
     var info = h("div", { class: "row" });
     cv.c.addEventListener("click", function (e) {
       if (over) return; if (!started) { started = true; timer = setInterval(function () { left--; if (Object.keys(plq).length < 14 && Math.random() < .8) spawn(); if (left <= 0) end(); info.textContent = "剩 " + left + " 秒　已清除 " + score + "　刷傷牙齦 " + hurts; paint(); }, 1000); }

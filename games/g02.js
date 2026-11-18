@@ -41,6 +41,7 @@ NMNS.register(2, function (root) {
     if (over) return;
     over = true;
     var score = Math.max(0, 100 - asked * 10 - (i === thief ? 0 : 60));
+    NMNS.finish(2, score);
     if (i === thief) m.say("抓到怪盜了！你問了 " + asked + " 個問題，得分 " + score + "。", "ok");
     else m.say("抓錯人了！真正的怪盜是嫌犯 " + (thief + 1) + "。得分 " + score + "。按「重新開始」再玩。", "bad");
   }

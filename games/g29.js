@@ -58,7 +58,7 @@ NMNS.register(29, function (root) {
     area.append(h("table", { class: "t" }, h("tr", {}, h("th", {}, "項目"), h("th", {}, "得分")), h("tr", {}, h("td", {}, "數字記憶"), h("td", {}, d == null ? "尚未測驗" : d + " / 33")), h("tr", {}, h("td", {}, "翻牌配對"), h("td", {}, p == null ? "尚未測驗" : p + " / 34")), h("tr", {}, h("td", {}, "燈光順序"), h("td", {}, s == null ? "尚未測驗" : s + " / 33")), h("tr", {}, h("th", {}, "總分"), h("th", {}, tot + " / 100"))),
       h("p", { class: "big" }, done ? (tot >= 85 ? "記憶力超強！" : tot >= 65 ? "記憶力良好。" : tot >= 40 ? "普通，多練習會進步。" : "繼續訓練，記憶像肌肉一樣會越練越強。") : "三項都做完才有完整評語。"),
       h("p", { class: "link" }, "記憶小技巧：把數字分組（例如 3-3-4）、大聲複誦、把東西連成故事、睡飽覺——睡眠能幫海馬迴把新記憶存起來。"));
-    m.say("你的記憶分數。", "info");
+    m.say("你的記憶分數。", "info"); if (done) NMNS.finish(29, tot);
   }
   function brain() {
     area.innerHTML = ""; var P = [

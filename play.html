@@ -14,16 +14,20 @@
 <main>
   <div class="edu" id="edu"><b>教育內容（1991 年原文）</b><span id="eduText"></span></div>
   <div class="stage" id="stage"><noscript>需要啟用 JavaScript 才能遊玩。</noscript></div>
+  <div class="edu" id="scoreBox" hidden style="margin-top:14px"></div>
   <div class="nav">
     <a class="btn alt" id="prev" href="#">← 上一款</a>
     <a class="btn alt" href="index.html">遊戲選單</a>
     <button class="btn alt" type="button" id="again">重新開始</button>
     <a class="btn alt" id="next" href="#">下一款 →</a>
+    <button class="btn alt" type="button" id="lb" hidden>🏆 高分榜</button>
     <a class="btn alt" id="fb" href="feedback.html">📝 提供當年資料</a>
   </div>
 </main>
 <script src="data/games.js"></script>
+<script src="data/config.js"></script>
 <script src="shared/engine.js"></script>
+<script src="shared/scores.js"></script>
 <script>
 (function () {
   var n = parseInt(new URLSearchParams(location.search).get("g"), 10);
@@ -39,6 +43,7 @@
   document.getElementById("prev").href = "play.html?g=" + (n > 1 ? n - 1 : 30);
   document.getElementById("next").href = "play.html?g=" + (n < 30 ? n + 1 : 1);
   document.getElementById("fb").href = "feedback.html?g=" + n;
+  var lb = document.getElementById("lb"); if (NMNS.api.enabled && NMNS.scoreable(n)) { lb.hidden = false; lb.addEventListener("click", function () { NMNS.showBoard(n); }); }
   document.getElementById("again").addEventListener("click", function () { location.reload(); });
   var s = document.createElement("script");
   s.src = "games/g" + no + ".js";

@@ -44,6 +44,7 @@ NMNS.register(4, function (root) {
     move(sel, p); sel = -1; draw(); upd();
     if (pegs[2].length === n) {
       var best = Math.pow(2, n) - 1;
+      NMNS.finish(4, moves, { variant: n + " 片" });
       m.say(moves === best ? "完美！用了最少步數 " + best + " 步。" : "完成！用了 " + moves + " 步（最少是 " + best + " 步）。", "ok");
     }
   }

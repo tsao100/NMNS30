@@ -79,3 +79,4 @@ table.t td, table.t th { border: 1px solid var(--line); padding: 3px 8px; text-a
 .nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
 footer { max-width: 960px; margin: 24px auto; padding: 0 16px 24px; color: var(--muted); font-size: .85rem; }
 @media (max-width: 480px) { body { font-size: 15px; } main { padding: 10px; } .stage { padding: 10px; } }
+[hidden] { display: none !important; }

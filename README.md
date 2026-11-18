@@ -22,3 +22,9 @@ Settings → Pages → Branch: main / root。網址是 `https://<帳號>.github.
 
 ## 新增或修改遊戲
 每個遊戲是 `NMNS.register(編號, function (root) { … })`，把畫面建在 `root` 裡即可；共用工具見 `shared/engine.js`（`h()` 建 DOM、`btn()`、`tabs()`、`makeCanvas()`、`arith()` 等）。
+
+## 高分榜與反饋資料庫（Supabase，選用）
+1. 在 Supabase 後台 SQL Editor 貼上並執行 `supabase/schema.sql`（建立 `scores`、`feedback` 兩張表與 RLS 權限）。
+2. 把 Project URL 與 **anon public key** 填入 `data/config.js` 的 `SUPABASE_URL`、`SUPABASE_ANON_KEY`。不要放 service_role key。
+3. 沒填就完全不啟用：遊戲照常玩，反饋頁退回 GitHub／Email／複製。
+注意：成績由瀏覽器送出，懂技術的人可以偽造，只適合當趣味榜；反饋留言只能新增、不能公開讀取。
